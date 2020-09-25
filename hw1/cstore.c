@@ -58,15 +58,16 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName,
         size_t n;
         //int count = 0;
         char byte_buff[16];
-        int fileRounds = 0;
-        int intArray[4];
+        long fileRounds = 0;
+        long longArray[2];
 
 
         fileRounds = fileLength / MAX_ENCRYPT_BLOCK_BYTES;
         if (fileLength % MAX_ENCRYPT_BLOCK_BYTES > 0)
                 fileRounds++;
         
-        intArray[0] = fileRounds;
+        longArray[0] = fileRounds;
+        printf("how many rounds?: %lu\n", longArray[0]);
 
         for(int i = 0; i < 8; i++) {
 
@@ -82,7 +83,7 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName,
                 printf("wrote %d bytes\n", n);
         }
  
-        memcpy(byte_buff, intArray, 16);
+        memcpy(byte_buff, longArray, 16);
 
         //printf("y name: %s\n", byte_buff);
 
@@ -166,14 +167,35 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         
         aes_key_setup(hash_pass, key_schedule, 256);
        
+        char fileName[128];
+        long fileLengthArray[2];
+        long fileRounds;
 
         // LOOP TO GET FILE NAME
+        for (int i = 0; i < (128/16); i++) {
+               if ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) < 0) {
+               die("read failed");
+               }
+                
+               aes_decrypt(buf, dec_buf, key_schedule, 256);
+
+               strcat(fileName, dec_buf);
+
+
+        }
+
+        printf("file name: %s\n", fileName);
 
         // LOOP TO GET LENGTH
 
+        if ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) < 0) {
+                die("read failed");
+        }
+                
+        aes_decrypt(buf, dec_buf, key_schedule, 256);
 
-
-
+        fileRounds = *(long *)dec_buf;
+        printf("file rounds: %lu\n", fileRounds);
 
         // Read in 16 bytes
         while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
@@ -334,8 +356,11 @@ int main(int argc, char *argv[])
                                 printf("file size %ld\n", addFileSize);
 
                                 char fileName[128];
+                                int nameLength = strlen(newFile_name);
                                 strcpy(fileName, newFile_name);
-                                
+                                fileName[nameLength] = 0;
+                                printf("original file name %s\n", fileName);
+
                                 addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
 
 	                } else {
