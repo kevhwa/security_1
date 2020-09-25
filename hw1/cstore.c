@@ -12,6 +12,7 @@
 #define MAX_PASS_BUFF_BYTES 32
 #define MAX_DATA_BUFF_BYTES 4096 /* Maximum buffer for transfering data */
 #define MAX_ENCRYPT_BLOCK_BITS 128
+#define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
 
 static void die(const char *message)
@@ -39,40 +40,45 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         WORD key_schedule[60];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         int count = 0;
+        char byte_buff[16];
 
         aes_key_setup(hash_pass, key_schedule, 256);
         
         // Read in 16 bytes
         while ((n = fread(buf, 1, (sizeof(buf) / 8), newFile)) > 0) {
                 
-                printf("encrypt read in %d bytes\n", n);
+                //printf("encrypt read in %d bytes\n", n);
                 // If less than 16 bytes, pad it with a value that its missing (in char)
-                if (n < (MAX_ENCRYPT_BLOCK_BITS / 8)) {
+                if (n < MAX_ENCRYPT_BLOCK_BYTES) {
                        
-                        char fill_amount = (MAX_ENCRYPT_BLOCK_BITS / 8)- n;
-                        printf("fill value %d\n" ,fill_amount);
-                        printf("\n");
+                        memcpy(byte_buff, buf, n);
 
-                        for (int i = n; i < (sizeof(buf) / 8); i++ ) {
-                                printf("i value: %d\n", i);
-                                buf[i * 8] = fill_amount;
-                                printf("print buf: %s\n", buf);
+                        char fill_amount = sizeof(byte_buff)- n;
+                        //printf("fill value %d\n" ,fill_amount);
+
+                        for (int i = (n -1) ; i < sizeof(byte_buff) ; i++ ) {
+                                byte_buff[i] = fill_amount;
                                 count++;
                         }
+
+                        memcpy(buf, byte_buff, 16);
+                        //printf("checking memcpy work: %s\n", buf);
+
                 }
 
-                printf("encrypt added %d bytes\n", count);
+               // printf("encrypt added %d bytes\n", count);
                 
                 char temp = buf[MAX_ENCRYPT_BLOCK_BITS - 8];
-                printf("testing temp %d\n", temp);
+                //printf("testing temp %d\n", temp);
 
-                printf("plaintext: %s\n", buf);
+                //printf("plaintext: %s\n", buf);
 
                 aes_encrypt(buf, enc_buf, key_schedule, 256);
 
-                if ((fwrite(enc_buf, 1, n, archiveFile)) != n) {
+                if ((fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                         die("write failed\n");
                 }
+                //printf("wrote %d bytes\n", n);
         }
 
         if (ferror(archiveFile)) {
@@ -95,11 +101,11 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         // Read in 16 bytes
         while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
                 
-                printf("decrypt read in %d bytes\n", n); 
+                //printf("decrypt read in %d bytes\n", n); 
                 
                 aes_decrypt(buf, dec_buf, key_schedule, 256);
                 
-                printf("%s\n", dec_buf);
+                //printf("%s\n", dec_buf);
 
                 if ((fwrite(dec_buf, 1, n, newFile)) != n) {
                         die("write failed\n");
