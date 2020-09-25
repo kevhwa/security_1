@@ -8,10 +8,11 @@
 #include <sys/stat.h>
 // include others
 
-#define MAX_NAME_BUFF 100 /* Maximum buffer for names */
-#define MAX_PASS_BUFF 32
-#define MAX_DATA_BUFF 4096 /* Maximum buffer for transfering data */
-#define HASH_ITR 10000
+#define MAX_NAME_BUFF_BYTES 100 /* Maximum buffer for names */
+#define MAX_PASS_BUFF_BYTES 32
+#define MAX_DATA_BUFF_BYTES 4096 /* Maximum buffer for transfering data */
+#define MAX_ENCRYPT_BLOCK_BITS 128
+#define HASH_ITR 100000
 
 static void die(const char *message)
 {
@@ -22,7 +23,7 @@ static void die(const char *message)
 void checkPassValid(char *password)
 {
 	int length;
-	if((length = strlen(password)) > MAX_PASS_BUFF)
+	if((length = strlen(password)) > MAX_PASS_BUFF_BYTES)
 		die("Password too long");
 	
 	for(int i = 0; i < length; i++) {
@@ -31,17 +32,90 @@ void checkPassValid(char *password)
 	}
 }
 
-void addFile(FILE *newFile, FILE *archiveFile)
+void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
 {
         size_t n;
-        char buf[MAX_DATA_BUFF];
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        WORD key_schedule[60];
+        BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        int count = 0;
+
+        aes_key_setup(hash_pass, key_schedule, 256);
         
-        while ((n = fread(buf, 1, sizeof(buf), newFile)) > 0) {
+        // Read in 16 bytes
+        while ((n = fread(buf, 1, (sizeof(buf) / 8), newFile)) > 0) {
                 
-                if ((fwrite(buf, 1, n, archiveFile)) != n) {
+                printf("encrypt read in %d bytes\n", n);
+                // If less than 16 bytes, pad it with a value that its missing (in char)
+                if (n < (MAX_ENCRYPT_BLOCK_BITS / 8)) {
+                       
+                        char fill_amount = (MAX_ENCRYPT_BLOCK_BITS / 8)- n;
+
+                        for (int i = n; i < (sizeof(buf) / 8); i++ ) {
+                                buf[i * 8] = fill_amount;
+                                n++;
+                                count++;
+                        }
+                        
+
+                }
+
+                printf("encrypt added %d bytes\n", count);
+                
+                aes_encrypt(buf, enc_buf, key_schedule, 256);
+
+                if ((fwrite(enc_buf, 1, n, archiveFile)) != n) {
                         die("write failed\n");
                 }
         }
+
+        if (ferror(archiveFile)) {
+                die("fread failed\n");
+        } 
+
+        fclose(archiveFile);
+        fclose(newFile);
+}
+
+void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
+{
+        size_t n;
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        WORD key_schedule[60];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+
+        aes_key_setup(hash_pass, key_schedule, 256);
+        
+        // Read in 16 bytes
+        while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
+                
+                printf("decrypt read in %d bytes\n", n); 
+                
+                aes_decrypt(buf, dec_buf, key_schedule, 256);
+
+
+                if ((fwrite(dec_buf, 1, n, newFile)) != n) {
+                        die("write failed\n");
+                }
+        }
+                
+        char filler = dec_buf[sizeof(buf) - 8];
+        char null_char = '\0';
+        char erase_buf[filler];
+        fseek(newFile, 0 - filler, SEEK_END);
+        printf("how many fillers %d\n", filler);
+
+        printf("before meat\n");
+        for (int i = 0; i < sizeof(erase_buf); i++)
+        {
+                erase_buf[i] = null_char;
+        }
+        
+        if ((fwrite(erase_buf, 1, filler, newFile)) != filler) {
+                die("write failed\n");
+        }
+        
+        printf("after write\n"); 
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -80,7 +154,7 @@ int main(int argc, char *argv[])
 	char *password;
 
         SHA256_CTX ctx;
-        BYTE pass_hash[SHA256_BLOCK_SIZE];
+        BYTE hash_pass[SHA256_BLOCK_SIZE];
 	// If password option is given
 	if(strcmp(pass_option, pass_opt) == 0) {
 		password = *argv++; // argv 3 -> 4
@@ -91,13 +165,22 @@ int main(int argc, char *argv[])
 		argv++; //argv  3 -> 4
 	}
 
+	//BYTE text3[] = {"aaaaaaaaaa"};
+	//BYTE hash3[SHA256_BLOCK_SIZE] = {0xcd,0xc7,0x6e,0x5c,0x99,0x14,0xfb,0x92,0x81,0xa1,0xc7,0xe2,0x84,0xd7,0x3e,0x67,
+	                                 //0xf1,0x80,0x9a,0x48,0xa4,0x97,0x20,0x0e,0x04,0x6d,0x39,0xcc,0xc7,0x11,0x2c,0xd0};
+
         sha256_init(&ctx);
-        for (int i = 0; i < HASH_ITR; ++idx) {
+        for (int i = 0; i < HASH_ITR; ++i) {
                 sha256_update(&ctx, password, strlen(password));
         }
-        sha256_final(&ctx, pass_hash);
-
-
+        sha256_final(&ctx, hash_pass);
+/*
+        if (memcmp(pass_hash, hash3, SHA256_BLOCK_SIZE) == 0){
+                printf("%s\n", "hash success");
+        } else {
+                printf("%s\n", "hash failed");
+        }
+*/
 
 	// Now we have password set and argv is aligned 
 	
@@ -126,13 +209,41 @@ int main(int argc, char *argv[])
                                         die("open failed");
                                 }
 
-                                addFile(newFile_fp, archive_fp); 
+                                addFile(newFile_fp, archive_fp, hash_pass); 
 
 	                } else {
-		                
+                               
+                               
+                               //Add what happens if file doesn't exist
+
+
+
+	                }
+                } else if ((strcmp(func_name, "extract")) == 0) {
+                        if (access(archive_name, F_OK) == 0) {
+                                
+                                archive_fp = fopen(archive_name, "rb");
+                                if (archive_fp == NULL) {
+                                        die("open failed");
+                                }
+
+                                newFile_name = "decryptFileTest1";
+                                newFile_fp = fopen(newFile_name, "wb");
+                                if(newFile_fp == NULL) {
+                                        die("open failed");
+                                }
+
+                                extractFile(newFile_fp, archive_fp, hash_pass); 
+
+	                } else {
+                               
+                               
+                               //Add what happens if archive doesn't exist
+
+
+
 	                }
                 }
-
         }
                 
 
