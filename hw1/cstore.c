@@ -50,18 +50,24 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
                 if (n < (MAX_ENCRYPT_BLOCK_BITS / 8)) {
                        
                         char fill_amount = (MAX_ENCRYPT_BLOCK_BITS / 8)- n;
+                        printf("fill value %d\n" ,fill_amount);
+                        printf("\n");
 
                         for (int i = n; i < (sizeof(buf) / 8); i++ ) {
+                                printf("i value: %d\n", i);
                                 buf[i * 8] = fill_amount;
-                                n++;
+                                printf("print buf: %s\n", buf);
                                 count++;
                         }
-                        
-
                 }
 
                 printf("encrypt added %d bytes\n", count);
                 
+                char temp = buf[MAX_ENCRYPT_BLOCK_BITS - 8];
+                printf("testing temp %d\n", temp);
+
+                printf("plaintext: %s\n", buf);
+
                 aes_encrypt(buf, enc_buf, key_schedule, 256);
 
                 if ((fwrite(enc_buf, 1, n, archiveFile)) != n) {
@@ -92,30 +98,40 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
                 printf("decrypt read in %d bytes\n", n); 
                 
                 aes_decrypt(buf, dec_buf, key_schedule, 256);
-
+                
+                printf("%s\n", dec_buf);
 
                 if ((fwrite(dec_buf, 1, n, newFile)) != n) {
                         die("write failed\n");
                 }
         }
-                
-        char filler = dec_buf[sizeof(buf) - 8];
+        /*       
+        char filler = dec_buf[((sizeof(buf) -1)- 8)];
         char null_char = '\0';
         char erase_buf[filler];
-        fseek(newFile, 0 - filler, SEEK_END);
-        printf("how many fillers %d\n", filler);
+        */
+        char filler_buf[1];
+        fseek(newFile, -1 , SEEK_END);
 
-        printf("before meat\n");
-        for (int i = 0; i < sizeof(erase_buf); i++)
+        if (fread(filler_buf, 1, 1, newFile) != 1) {
+                die("read failed\n");
+        }
+        
+        printf("how many fillers %d\n", filler_buf[0]);
+        char null_char = '\0';
+        char erase_buf[filler_buf[0]];
+
+        for (int i = 0; i < filler_buf[0]; i++)
         {
                 erase_buf[i] = null_char;
         }
         
-        if ((fwrite(erase_buf, 1, filler, newFile)) != filler) {
+        fseek(newFile, 0 - filler_buf[0], SEEK_END);
+
+        if ((fwrite(erase_buf, 1, filler_buf[0], newFile)) != filler_buf[0]) {
                 die("write failed\n");
         }
         
-        printf("after write\n"); 
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -228,7 +244,7 @@ int main(int argc, char *argv[])
                                 }
 
                                 newFile_name = "decryptFileTest1";
-                                newFile_fp = fopen(newFile_name, "wb");
+                                newFile_fp = fopen(newFile_name, "wb+");
                                 if(newFile_fp == NULL) {
                                         die("open failed");
                                 }
