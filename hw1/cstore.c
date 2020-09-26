@@ -73,6 +73,25 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
         }
 }
 
+void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_schedule)
+{
+
+        BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        char byte_buff[16];
+        int intArray[4];
+        size_t n;
+        intArray[0] = fileNameLength;
+
+        //encrypt length and write into archive
+        memcpy(byte_buff, intArray, 16);
+
+        aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+
+        if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
+                die("write failed\n");
+        }
+}
+
 void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
 {
 
@@ -92,7 +111,7 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
         }
 }
 
-void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName, long fileLength)
+void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
 
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -105,6 +124,7 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName,
         aes_key_setup(hash_pass, key_schedule, 256);
         
         encryptPasswordCheck(archiveFile, key_schedule);
+        encryptFileNameLength(archiveFile, fileNameLength, key_schedule);
         encryptFileName(archiveFile, fileName, key_schedule); 
         encryptFileLength(archiveFile, fileLength, key_schedule);
 
@@ -172,9 +192,32 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
                 
                aes_decrypt(byte_buff, dec_buf, key_schedule, 256);
 
-               strcat(fileName, dec_buf);
+               if (i = 0) {
+                       strcpy(fileName, dec_buf);
+               } else {
+                       strncat(fileName, dec_buf, 16);
+               }
         }
+        printf("file name: %s\n", fileName);
         return fileName;
+}
+
+int *extractFileNameLength(FILE *archiveFile, WORD *key_schedule)
+{
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        int fileLengthArray[4];
+        size_t n;
+ 
+        if ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
+                die("read failed");
+        }
+                
+        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        
+        int *fileNameLength = malloc(sizeof(int));
+        *fileNameLength = *(int *)dec_buf;
+        return fileNameLength;
 }
 
 long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
@@ -209,7 +252,7 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
         //if (passIsValid == 0)
                 //printf("pass is valid\n");
-
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
         char *fileName = extractFileName(archiveFile, key_schedule);
         long *fileLength = extractFileLength(archiveFile, key_schedule);
         long lengthCounter = *fileLength;
@@ -232,6 +275,7 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
                 lengthCounter -= n;
         }
         
+        free(fileNameLength);
         free(fileName);
         free(fileLength);
 
@@ -253,6 +297,17 @@ int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
         return passIsValid == 0;
 }
 
+void checkFileNameReq(char *newFileName)
+{
+        if (strlen(newFileName) > 100)
+                die ("File name must be under 100 characters");
+
+	for(int i = 0; i < strlen(newFileName); i++) {
+		if(!isascii(newFileName[i]))
+			die("ASCII characters only");
+	}
+
+}
 
 int main(int argc, char *argv[])
 {
@@ -322,6 +377,8 @@ int main(int argc, char *argv[])
         
         while (newFile_name = *argv++) {
         
+                checkFileNameReq(newFile_name);
+        
                 //* **** ADD CHECK TO SEE IF FILE IS TOO BIG FOR INT SIZE
                 // ******** ADD CHECK TO SEE IF FILE NAME IS LONGER THAN 100 CHARS
 
@@ -360,13 +417,13 @@ int main(int argc, char *argv[])
                                 //printf("original file name %s\n", fileName);
 
                                 if (newArchive) {
-                                        addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
+                                        addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
                                 } else {
                                         if (keyIsValid(archive_fp, hash_pass)) {
 
                                                 fseek(archive_fp, 0, SEEK_SET);
 
-                                                addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
+                                                addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
                                         } else {
                                                 die("Wrong password");
                                 
@@ -374,12 +431,7 @@ int main(int argc, char *argv[])
                                 }
 	                } else {
                                
-                               
-                               //Add what happens if file doesn't exist
-                               //nothing right?
-
-
-
+                               die("Specified file does not exist"); 
 	                }
                 } else if ((strcmp(func_name, "extract")) == 0) {
                         if (access(archive_name, F_OK) == 0) {
@@ -389,8 +441,17 @@ int main(int argc, char *argv[])
                                         die("open failed");
                                 }
 
-                                newFile_name = "decryptFileTest1";
-                                newFile_fp = fopen(newFile_name, "wb+");
+                                int newFileNameLength = strlen(newFile_name);
+                                char nameExt[] = "-decrypted";
+                                int newFileExtLength = strlen(nameExt);
+
+                                char decFileName[newFileNameLength + newFileExtLength + 1];
+                                strcpy(decFileName, newFile_name);
+                                strcat(decFileName, nameExt);
+
+                                printf("dec file name: %s\n", decFileName);
+
+                                newFile_fp = fopen(decFileName, "wb+");
                                 if(newFile_fp == NULL) {
                                         die("open failed");
                                 }
@@ -409,11 +470,7 @@ int main(int argc, char *argv[])
 
 	                } else {
                                
-                               
-                               //Add what happens if archive doesn't exist
-
-
-
+                                die("Specified archive file does not exist");
 	                }
                 }
         }
