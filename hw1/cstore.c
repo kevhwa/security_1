@@ -152,7 +152,7 @@ int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
                 
         aes_decrypt(buf, dec_buf, key_schedule, 256);
         
-        return strncmp(passcode, dec_buf, 16);;
+        return strncmp(passcode, dec_buf, 16);
 }
 
 
@@ -207,14 +207,10 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         aes_key_setup(hash_pass, key_schedule, 256);
 
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-        if (passIsValid == 0)
-                printf("pass is valid\n");
+        //if (passIsValid == 0)
+                //printf("pass is valid\n");
 
         char *fileName = extractFileName(archiveFile, key_schedule);
-        printf("file name: %s\n", fileName);
-        
-        // GET LENGTH
-
         long *fileLength = extractFileLength(archiveFile, key_schedule);
         long lengthCounter = *fileLength;
 
@@ -246,6 +242,17 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         fclose(archiveFile);
         fclose(newFile);
 }
+
+int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
+{
+        WORD key_schedule[60];
+        aes_key_setup(hash_pass, key_schedule, 256);
+
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
+
+        return passIsValid == 0;
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -301,11 +308,14 @@ int main(int argc, char *argv[])
         struct stat archive_st;
         //struct stat addFile_st;
         long addFileSize;
-        
+        int newArchive;
 
         if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode)) {
                 die("Not a file");
         }
+
+        // ******** CHECK THAT THE ARCHIVE IS NOT EMPTY
+
         /*if (stat(newFile_name, &addFile_st) == 0 && S_ISDIR(addFile_st.st_mode)) {
                 die("Not a file");
         }*/
@@ -317,16 +327,26 @@ int main(int argc, char *argv[])
 
                 if ((strcmp(func_name, "add")) == 0) {
                         if (access(newFile_name, F_OK) == 0) {
-                                
-                                archive_fp = fopen(archive_name, "ab+");
-                                if (archive_fp == NULL) {
-                                        die("open failed");
+ 
+                                if (stat(archive_name, &archive_st) != 0) {
+                                        archive_fp = fopen(archive_name, "wb+");
+                                        if (archive_fp == NULL) {
+                                                die("open failed");
+                                        }
+                                        newArchive = 1;
+                                } else {
+                                        archive_fp = fopen(archive_name, "ab+");
+                                        if (archive_fp == NULL) {
+                                                die("open failed");
+                                        }
+                                        newArchive = 0;
                                 }
-
+                               
                                 newFile_fp = fopen(newFile_name, "rb");
                                 if(newFile_fp == NULL) {
                                         die("open failed");
                                 }
+                                
                                 
                                 fseek(newFile_fp, 0, SEEK_END);
                                 addFileSize = ftell(newFile_fp) - 1;
@@ -339,8 +359,19 @@ int main(int argc, char *argv[])
                                 fileName[nameLength] = 0;
                                 //printf("original file name %s\n", fileName);
 
-                                addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
+                                if (newArchive) {
+                                        addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
+                                } else {
+                                        if (keyIsValid(archive_fp, hash_pass)) {
 
+                                                fseek(archive_fp, 0, SEEK_SET);
+
+                                                addFile(newFile_fp, archive_fp, hash_pass, fileName, addFileSize); 
+                                        } else {
+                                                die("Wrong password");
+                                
+                                        }
+                                }
 	                } else {
                                
                                
@@ -364,7 +395,17 @@ int main(int argc, char *argv[])
                                         die("open failed");
                                 }
 
-                                extractFile(newFile_fp, archive_fp, hash_pass); 
+                                if (keyIsValid(archive_fp, hash_pass)) {
+
+                                        fseek(archive_fp, 0, SEEK_SET);
+
+                                        extractFile(newFile_fp, archive_fp, hash_pass); 
+                                } else {
+                                        die("Wrong password");
+                                
+                                }
+
+
 
 	                } else {
                                
