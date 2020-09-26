@@ -456,8 +456,8 @@ int main(int argc, char *argv[])
                                 int newFileExtLength = strlen(nameExt);
 
                                 char decFileName[newFileNameLength + newFileExtLength + 1];
-                                strcpy(decFileName, newFile_name);
-                                strcat(decFileName, nameExt);
+                                strncpy(decFileName, newFile_name, newFileNameLength);
+                                strncat(decFileName, nameExt, newFileExtLength);
 
                                 printf("original file name length: %d\n", newFileNameLength);
                                 printf("dec file name: %s\n", decFileName);
@@ -483,6 +483,10 @@ int main(int argc, char *argv[])
                                
                                 die("Specified archive file does not exist");
 	                }
+                } else {
+                        
+                        die("Please choose an appropriate function: list, add, extract, delete");
+
                 }
         }
                 
