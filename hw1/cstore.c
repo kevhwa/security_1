@@ -16,17 +16,16 @@
 #define HASH_ITR 100000
 
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
-struct fileData {
-        char fileName[124];
-        int fileRounds;
-};  //makes fileData to size 128
 
 static void die(const char *message)
 {
 	perror(message);
 	exit(1);
 }
-	
+
+// void checkFileNameValid
+// void fileLengthValid
+
 void checkPassValid(char *password)
 {
 	int length;
@@ -39,59 +38,59 @@ void checkPassValid(char *password)
 	}
 }
 
-void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName, long fileLength)
+void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
 {
-
-        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
-        WORD key_schedule[60];
- 
-        // ******************** CHECK IF PASSWORD IS CORRECT
-
-        aes_key_setup(hash_pass, key_schedule, 256);
-        
-        size_t n;
-        //int count = 0;
         char byte_buff[16];
-        //long fileRounds = 0;
-        long longArray[2];
-        longArray[0] = fileLength;
-
-        /*fileRounds = fileLength / MAX_ENCRYPT_BLOCK_BYTES;
-        if (fileLength % MAX_ENCRYPT_BLOCK_BYTES > 0)
-                fileRounds++;
-        
-        longArray[0] = fileRounds;
-        printf("how many rounds?: %lu\n", longArray[0]);*/
+        size_t n;
 
         //Encrypt file name and write into archive
         for(int i = 0; i < 8; i++) {
 
                 memcpy(byte_buff, &fileName[i * 16], 16);
 
-                //printf("copy name: %s\n", byte_buff);
-
                 aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
 
                 if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                         die("write failed\n");
                 }
-                //printf("wrote %d bytes\n", n);
         }
- 
+}
+
+void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
+{
+
+        BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        char byte_buff[16];
+        long longArray[2];
+        size_t n;
+        longArray[0] = fileLength;
+
         //encrypt length and write into archive
         memcpy(byte_buff, longArray, 16);
-
-        //printf("y name: %s\n", byte_buff);
 
         aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
 
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
-        printf("wrote %d bytes\n", n);
-      
-       
+}
+
+void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName, long fileLength)
+{
+
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        WORD key_schedule[60];
+        size_t n;
+        char byte_buff[16];
+        // ******************** CHECK IF PASSWORD IS CORRECT
+
+        aes_key_setup(hash_pass, key_schedule, 256);
+        
+        encryptFileName(archiveFile, fileName, key_schedule); 
+        encryptFileLength(archiveFile, fileLength, key_schedule);
+
         // Read in 16 bytes intervals
         while ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, newFile)) > 0) {
                 
@@ -112,9 +111,6 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName,
 
                         memcpy(buf, byte_buff, MAX_ENCRYPT_BLOCK_BYTES);
                 }
-               // printf("encrypt added %d bytes\n", count);
-                
-                //printf("plaintext: %s\n", buf);
 
                 aes_encrypt(buf, enc_buf, key_schedule, 256);
 
@@ -132,6 +128,45 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *fileName,
         fclose(newFile);
 }
 
+char *extractFileName(FILE *archiveFile, WORD *key_schedule)
+{
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        size_t n;
+        char byte_buff[MAX_ENCRYPT_BLOCK_BYTES];
+        char *fileName = malloc(128);
+
+
+        for (int i = 0; i < (128/16); i++) {
+               if ((n = fread(byte_buff, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
+               die("read failed");
+               }
+                
+               aes_decrypt(byte_buff, dec_buf, key_schedule, 256);
+
+               strcat(fileName, dec_buf);
+        }
+        return fileName;
+}
+
+long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
+{
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        long fileLengthArray[2];
+        size_t n;
+ 
+        if ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
+                die("read failed");
+        }
+                
+        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        
+        long *fileLength = malloc(sizeof(long));
+        *fileLength = *(long *)dec_buf;
+        return fileLength;
+}
+
 void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
 {
 
@@ -142,14 +177,10 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         int fileByteCount = 0;
         
         aes_key_setup(hash_pass, key_schedule, 256);
-       
-        char fileName[128];
-        long fileLengthArray[2];
-        long fileLength;
-        long lengthCounter;
 
+        char *fileName = extractFileName(archiveFile, key_schedule);
         // LOOP TO GET FILE NAME
-        for (int i = 0; i < (128/16); i++) {
+        /*for (int i = 0; i < (128/16); i++) {
                if ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) < 0) {
                die("read failed");
                }
@@ -159,21 +190,21 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
                strcat(fileName, dec_buf);
 
 
-        }
+        }*/
 
         printf("file name: %s\n", fileName);
-
+        free(fileName);
         // GET LENGTH
-
-        if ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) < 0) {
+        long *fileLength = extractFileLength(archiveFile, key_schedule);
+        long lengthCounter = *fileLength;
+/*        if ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) < 0) {
                 die("read failed");
         }
                 
         aes_decrypt(buf, dec_buf, key_schedule, 256);
 
         fileLength = *(long *)dec_buf;
-        printf("file Length: %lu\n", fileLength);
-        lengthCounter = fileLength;
+        printf("file Length: %lu\n", fileLength);*/
 
         // Read in 16 bytes
         while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
