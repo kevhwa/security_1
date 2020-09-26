@@ -192,8 +192,8 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
                 
                aes_decrypt(byte_buff, dec_buf, key_schedule, 256);
 
-               if (i = 0) {
-                       strcpy(fileName, dec_buf);
+               if (i == 0) {
+                       strncpy(fileName, dec_buf, 16);
                } else {
                        strncat(fileName, dec_buf, 16);
                }
@@ -238,7 +238,7 @@ long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
         return fileLength;
 }
 
-void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
+void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 {
 
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -256,6 +256,17 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
         char *fileName = extractFileName(archiveFile, key_schedule);
         long *fileLength = extractFileLength(archiveFile, key_schedule);
         long lengthCounter = *fileLength;
+
+        char testName[128];
+        printf("decrypted file name length: %d\n", *fileNameLength);
+        strncpy(testName, fileName, *fileNameLength); 
+        printf("original name: %s\n", newFileName);
+        printf("decrypted name: %s\n", fileName);
+
+        if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
+                printf("file name does not match\n");
+                die("file name does not match");
+        }
 
         // Read in 16 bytes
         while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
@@ -414,7 +425,6 @@ int main(int argc, char *argv[])
                                 int nameLength = strlen(newFile_name);
                                 strcpy(fileName, newFile_name);
                                 fileName[nameLength] = 0;
-                                //printf("original file name %s\n", fileName);
 
                                 if (newArchive) {
                                         addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
@@ -449,6 +459,7 @@ int main(int argc, char *argv[])
                                 strcpy(decFileName, newFile_name);
                                 strcat(decFileName, nameExt);
 
+                                printf("original file name length: %d\n", newFileNameLength);
                                 printf("dec file name: %s\n", decFileName);
 
                                 newFile_fp = fopen(decFileName, "wb+");
@@ -460,7 +471,7 @@ int main(int argc, char *argv[])
 
                                         fseek(archive_fp, 0, SEEK_SET);
 
-                                        extractFile(newFile_fp, archive_fp, hash_pass); 
+                                        extractFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
                                 } else {
                                         die("Wrong password");
                                 
