@@ -14,7 +14,7 @@
 #define MAX_ENCRYPT_BLOCK_BITS 128
 #define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
-#define METADATA_BLOCKSIZE 176
+#define METADATA_BLOCKSIZE 192
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
 static void die(const char *message)
@@ -54,6 +54,25 @@ void encryptPasswordCheck(FILE *archiveFile, WORD *key_schedule)
                 die("write failed\n");
         }
         
+}
+
+void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_schedule)
+{
+
+        BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        char byte_buff[16];
+        int intArray[4];
+        size_t n;
+        intArray[0] = deleteMarker;
+
+        //encrypt length and write into archive
+        memcpy(byte_buff, intArray, 16);
+
+        aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+
+        if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
+                die("write failed\n");
+        }
 }
 
 void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
@@ -129,6 +148,7 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLen
         aes_key_setup(hash_pass, key_schedule, 256);
         
         encryptPasswordCheck(archiveFile, key_schedule);
+        encryptDeleteFileMarker(archiveFile, 0, key_schedule); 
         encryptFileNameLength(archiveFile, fileNameLength, key_schedule);
         encryptFileName(archiveFile, fileName, key_schedule); 
         encryptFileLength(archiveFile, fileLength, key_schedule);
@@ -180,6 +200,24 @@ int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
         return strncmp(passcode, dec_buf, 16);
 }
 
+int *extractDeleteFileMarker(FILE *archiveFile, WORD *key_schedule)
+{
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        //int fileMarkerArray[4];
+        size_t n;
+ 
+        if ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
+                die("read failed");
+        }
+                
+        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        
+        int *fileMarker_ptr = malloc(sizeof(int));
+        *fileMarker_ptr = *(int *)dec_buf;
+        return fileMarker_ptr;
+}
+
 
 char *extractFileName(FILE *archiveFile, WORD *key_schedule)
 {
@@ -210,7 +248,7 @@ int *extractFileNameLength(FILE *archiveFile, WORD *key_schedule)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
-        int fileLengthArray[4];
+        //int fileLengthArray[4];
         size_t n;
  
         if ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
@@ -254,8 +292,7 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         aes_key_setup(hash_pass, key_schedule, 256);
 
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-        //if (passIsValid == 0)
-                //printf("pass is valid\n");
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
         int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
         char *fileName = extractFileName(archiveFile, key_schedule);
         long *fileLength = extractFileLength(archiveFile, key_schedule);
@@ -301,6 +338,75 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         fclose(newFile);
 }
 
+void deleteFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFileName)
+{
+        printf("\nInside delete file\n");
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        WORD key_schedule[60];
+        size_t n;
+        int fileByteCount = 0;
+        
+        aes_key_setup(hash_pass, key_schedule, 256);
+
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
+        char *fileName = extractFileName(archiveFile, key_schedule);
+        long *fileLength = extractFileLength(archiveFile, key_schedule);
+        long lengthCounter = *fileLength;
+
+        printf("decrypted file name length: %d\n", *fileNameLength);
+        printf("original name: %s\n", newFileName);
+        printf("decrypted name: %s\n", fileName);
+        printf("file length: %ld\n", lengthCounter);
+
+        long offset = 16*4;
+        fseek(archiveFile, -offset, SEEK_CUR);
+        encryptDeleteFileMarker(archiveFile, 1, key_schedule); 
+       
+        
+        
+        
+        
+        
+        
+        
+        /*if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
+                die("file name does not match");
+        }*/
+
+        // Read in 16 bytes
+        /*while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
+                
+                aes_decrypt(buf, dec_buf, key_schedule, 256);
+
+                
+                if (lengthCounter <= 16) {
+                        if ((fwrite(dec_buf, 1, lengthCounter, newFile)) != lengthCounter) {
+                                printf("decrypted: %s\n", dec_buf);
+                                die("write failed in leftover write\n");
+                        }
+                } else {
+                        if ((fwrite(dec_buf, 1, n, newFile)) != n) {
+                                die("write failed\n");
+                        }
+
+                }
+                lengthCounter -= n;
+        }*/
+        
+        free(fileNameLength);
+        free(fileName);
+        free(fileLength);
+
+        if (ferror(archiveFile)) {
+                die("fread failed\n");
+        } 
+        printf("exiting extract file\n");
+        fclose(newFile);
+}
+
 int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
 {
         WORD key_schedule[60];
@@ -317,6 +423,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         aes_key_setup(hash_pass, key_schedule, 256);
 
         int passIsValid;
+        int *fileDeleteMarker_ptr;
         int *fileNameLength;
         char *fileName; 
         long *fileLength; 
@@ -332,6 +439,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 printf("in while loop\n");
 
                 passIsValid = extractPasswordCheck(archiveFile, key_schedule);
+                fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
                 fileNameLength = extractFileNameLength(archiveFile, key_schedule);
                 fileName = extractFileName(archiveFile, key_schedule);
                 fileLength = extractFileLength(archiveFile, key_schedule);
@@ -339,8 +447,9 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         
                 printf("file name: %s\n", fileName);
                 printf("file length: %ld\n", lengthCounter);
+                printf("deleted file: %d\n", *fileDeleteMarker_ptr);
 
-                if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0) {
+                if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0 && (*fileDeleteMarker_ptr == 0)) {
                         printf("found one\n");
                         printf("\n");
                         fseek(archiveFile, -(long)metadataSize, SEEK_CUR);
@@ -569,10 +678,65 @@ int main(int argc, char *argv[])
                                 fclose(newFile_fp);
                                 goto func_end;
 	                }
+
+                } else if ((strcmp(func_name, "delete")) == 0) {
+                        if (access(archive_name, F_OK) == 0) {
+                                
+                                if (passCount == 0) {
+                                        archive_fp = fopen(archive_name, "r+b");
+                                        if (archive_fp == NULL) {
+                                                printf("open failed\n");
+                                                goto func_end;
+                                        }
+
+                                        fseek(archive_fp, 0, SEEK_END);
+                                        archiveFileSize = ftell(archive_fp) - 1;
+                                        fseek(archive_fp, 0, SEEK_SET);
+                                }
+
+                                /*int newFileNameLength = strlen(newFile_name);
+                                char nameExt[] = "-decrypted";
+                                int newFileExtLength = strlen(nameExt);
+
+                                char decFileName[newFileNameLength + newFileExtLength + 1];
+                                strncpy(decFileName, newFile_name, newFileNameLength + 1);
+                                strncat(decFileName, nameExt, newFileExtLength);*/
+
+                                printf("\n");
+                                printf("original file name: %s\n", newFile_name);
+                                //printf("original file name length: %d\n", newFileNameLength);
+                                //printf("dec file name: %s\n", decFileName);
+
+                                /*
+                                newFile_fp = fopen(decFileName, "wb+");
+                                if(newFile_fp == NULL) {
+                                        printf("open failed\n");
+                                        fclose(newFile_fp);
+                                        goto func_end;
+                                }*/
+
+                                if (keyIsValid(archive_fp, hash_pass)) {
+                                        fseek(archive_fp, 0, SEEK_SET);
+                                        long offset = findInArchive(archive_fp, hash_pass, newFile_name, archiveFileSize);
+
+                                        if (offset < 0) {
+                                                printf("File not in archive\n");
+                                                fclose(newFile_fp);
+                                                goto func_end;
+                                        }
+
+                                        deleteFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
+
+                                } else {
+                                        printf("Wrong password\n");
+                                        goto func_end;                               
+                                }        
+                                passCount++;
+                        }
                 } else {
                         
-                        printf("Please choose an appropriate function: list, add, extract, delete\n");
-                        goto func_end;
+                        die("Please choose an appropriate function: list, add, extract, delete");
+                        //goto func_end;
                 }
         }
                 
