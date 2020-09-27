@@ -14,7 +14,7 @@
 #define MAX_ENCRYPT_BLOCK_BITS 128
 #define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
-
+#define METADATA_BLOCKSIZE
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
 static void die(const char *message)
@@ -31,12 +31,16 @@ char passcode[16] = "Valid key TRUE!!";
 void checkPassValid(char *password)
 {
 	int length;
-	if((length = strlen(password)) > MAX_PASS_BUFF_BYTES)
-		die("Password too long");
+	if((length = strlen(password)) > MAX_PASS_BUFF_BYTES) {
+		printf("Password too long. Max size is 32 bytes\n");
+                goto func_end;
+        }
 	
 	for(int i = 0; i < length; i++) {
-		if(!isascii(password[i]))
-			die("ASCII characters only");
+		if(!isascii(password[i])) {
+		        printf("ASCII characters only for password\n");
+                        goto func_end;
+                }        
 	}
 }
 
@@ -265,9 +269,9 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         printf("decrypted name: %s\n", fileName);
         printf("file length: %ld\n", lengthCounter);
 
-        if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
+        /*if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
                 die("file name does not match");
-        }
+        }*/
 
         // Read in 16 bytes
         while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
@@ -321,7 +325,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         long *fileLength; 
         long lengthCounter;
 
-        int metadataSize = 16+16+128+16;
+        int metadataSize = METADATA_BLOCKSIZE;
         long offset = 0;
         int found = 0;
 
@@ -362,12 +366,16 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
 
 void checkFileNameReq(char *newFileName)
 {
-        if (strlen(newFileName) > 100)
-                die ("File name must be under 100 characters");
+        if (strlen(newFileName) > 100) {
+                printf("File name must be under 100 characters\n");
+                goto func_end;
+        }
 
 	for(int i = 0; i < strlen(newFileName); i++) {
-		if(!isascii(newFileName[i]))
-			die("ASCII characters only");
+		if(!isascii(newFileName[i])) {
+			printf("ASCII characters only for file names\n");
+                        goto func_end;
+                }
 	}
 
 }
@@ -455,22 +463,24 @@ int main(int argc, char *argv[])
                                 if (stat(archive_name, &archive_st) != 0) {
                                         archive_fp = fopen(archive_name, "wb+");
                                         if (archive_fp == NULL) {
-                                                die("open failed");
+                                                printf("open failed\n");
+                                                goto func_end
                                         }
                                         newArchive = 1;
                                 } else {
                                         archive_fp = fopen(archive_name, "ab+");
                                         if (archive_fp == NULL) {
-                                                die("open failed");
+                                                printf("open failed\n");
+                                                goto func_end;
                                         }
                                         newArchive = 0;
                                 }
                                
                                 newFile_fp = fopen(newFile_name, "rb");
                                 if(newFile_fp == NULL) {
-                                        die("open failed");
+                                        printf("open failed\n");
+                                        goto func_end;
                                 }
-                                
                                 
                                 fseek(newFile_fp, 0, SEEK_END);
                                 addFileSize = ftell(newFile_fp) - 1;
@@ -491,13 +501,16 @@ int main(int argc, char *argv[])
 
                                                 addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
                                         } else {
-                                                die("Wrong password");
+                                                fclose(newFile_fp);
+                                                printf("Wrong password");
+                                                goto func_end;
                                 
                                         }
                                 }
 	                } else {
                                
-                               die("Specified file does not exist"); 
+                               printf("Specified file does not exist"); 
+                               goto func_end;
 	                }
                 } else if ((strcmp(func_name, "extract")) == 0) {
                         if (access(archive_name, F_OK) == 0) {
@@ -505,7 +518,8 @@ int main(int argc, char *argv[])
                                 if (passCount == 0) {
                                         archive_fp = fopen(archive_name, "rb");
                                         if (archive_fp == NULL) {
-                                                die("open failed");
+                                                printf("open failed\n");
+                                                goto func_end;
                                         }
 
                                         fseek(archive_fp, 0, SEEK_END);
@@ -528,38 +542,39 @@ int main(int argc, char *argv[])
 
                                 newFile_fp = fopen(decFileName, "wb+");
                                 if(newFile_fp == NULL) {
-                                        die("open failed");
+                                        prinf("open failed\n");
+                                        fclose(newFile_fp);
+                                        goto func_end;
                                 }
-
-                                long testCount = ftell(archive_fp);
-                                long temp = 16 + 128 + 16 +16 + 32;
-                                //printf("diff: %ld\n", testCount - temp);
 
                                 if (keyIsValid(archive_fp, hash_pass)) {
-
                                         fseek(archive_fp, 0, SEEK_SET);
-
                                         long offset = findInArchive(archive_fp, hash_pass, newFile_name, archiveFileSize);
 
-                                        if (offset < 0)
-                                                die("File not in archive");
+                                        if (offset < 0) {
+                                                printf("File not in archive\n");
+                                                fclose(newFile_fp);
+                                                goto func_end;
+                                        }
 
                                         extractFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
-                                } else {
-                                        die("Wrong password");
-                                
-                                }
-        
-                                passCount++;
 
+                                } else {
+                                        printf("Wrong password\n");
+                                        fclose(newFile_fp);
+                                        goto func_end;                               
+                                }        
+                                passCount++;
 	                } else {
                                
-                                die("Specified archive file does not exist");
+                                printf("Specified archive file does not exist\n");
+                                fclose(newFile_fp);
+                                goto func_end;
 	                }
                 } else {
                         
-                        die("Please choose an appropriate function: list, add, extract, delete");
-
+                        printf("Please choose an appropriate function: list, add, extract, delete\n");
+                        goto func_end;
                 }
         }
                 
