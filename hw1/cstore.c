@@ -14,7 +14,7 @@
 #define MAX_ENCRYPT_BLOCK_BITS 128
 #define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
-#define METADATA_BLOCKSIZE
+#define METADATA_BLOCKSIZE 176
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
 static void die(const char *message)
@@ -32,14 +32,12 @@ void checkPassValid(char *password)
 {
 	int length;
 	if((length = strlen(password)) > MAX_PASS_BUFF_BYTES) {
-		printf("Password too long. Max size is 32 bytes\n");
-                goto func_end;
+		die("Password too long. Max size is 32 bytes");
         }
 	
 	for(int i = 0; i < length; i++) {
 		if(!isascii(password[i])) {
-		        printf("ASCII characters only for password\n");
-                        goto func_end;
+		        die("ASCII characters only for password\n");
                 }        
 	}
 }
@@ -163,7 +161,6 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLen
                 die("fread failed\n");
         } 
 
-        fclose(archiveFile);
         fclose(newFile);
 }
 
@@ -367,14 +364,12 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
 void checkFileNameReq(char *newFileName)
 {
         if (strlen(newFileName) > 100) {
-                printf("File name must be under 100 characters\n");
-                goto func_end;
+                die("File name must be under 100 characters");
         }
 
 	for(int i = 0; i < strlen(newFileName); i++) {
 		if(!isascii(newFileName[i])) {
-			printf("ASCII characters only for file names\n");
-                        goto func_end;
+			die("ASCII characters only for file names");
                 }
 	}
 
@@ -460,20 +455,22 @@ int main(int argc, char *argv[])
                 if ((strcmp(func_name, "add")) == 0) {
                         if (access(newFile_name, F_OK) == 0) {
  
-                                if (stat(archive_name, &archive_st) != 0) {
-                                        archive_fp = fopen(archive_name, "wb+");
-                                        if (archive_fp == NULL) {
-                                                printf("open failed\n");
-                                                goto func_end
+                                if (passCount == 0) {
+                                        if (stat(archive_name, &archive_st) != 0) {
+                                                archive_fp = fopen(archive_name, "wb+");
+                                                if (archive_fp == NULL) {
+                                                        printf("open failed\n");
+                                                        goto func_end;
+                                                }
+                                                newArchive = 1;
+                                        } else {
+                                                archive_fp = fopen(archive_name, "ab+");
+                                                if (archive_fp == NULL) {
+                                                        printf("open failed\n");
+                                                        goto func_end;
+                                                }
+                                                newArchive = 0;
                                         }
-                                        newArchive = 1;
-                                } else {
-                                        archive_fp = fopen(archive_name, "ab+");
-                                        if (archive_fp == NULL) {
-                                                printf("open failed\n");
-                                                goto func_end;
-                                        }
-                                        newArchive = 0;
                                 }
                                
                                 newFile_fp = fopen(newFile_name, "rb");
@@ -507,6 +504,7 @@ int main(int argc, char *argv[])
                                 
                                         }
                                 }
+                                passCount++;
 	                } else {
                                
                                printf("Specified file does not exist"); 
@@ -542,7 +540,7 @@ int main(int argc, char *argv[])
 
                                 newFile_fp = fopen(decFileName, "wb+");
                                 if(newFile_fp == NULL) {
-                                        prinf("open failed\n");
+                                        printf("open failed\n");
                                         fclose(newFile_fp);
                                         goto func_end;
                                 }
