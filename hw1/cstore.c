@@ -71,6 +71,7 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
                         die("write failed\n");
                 }
         }
+        printf("enc: file = %s\n", fileName);
 }
 
 void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_schedule)
@@ -109,6 +110,9 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
+
+        printf("enc: file length = %ld\n", fileLength);
+        printf("\n");
 }
 
 void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
@@ -119,7 +123,6 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLen
         WORD key_schedule[60];
         size_t n;
         char byte_buff[16];
-        // ******************** CHECK IF PASSWORD IS CORRECT
 
         aes_key_setup(hash_pass, key_schedule, 256);
         
@@ -172,6 +175,7 @@ int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
                 
         aes_decrypt(buf, dec_buf, key_schedule, 256);
         
+        printf("password check: %s\n", dec_buf);
         return strncmp(passcode, dec_buf, 16);
 }
 
@@ -198,7 +202,6 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
                        strncat(fileName, dec_buf, 16);
                }
         }
-        printf("file name: %s\n", fileName);
         return fileName;
 }
 
@@ -240,7 +243,7 @@ long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
 
 void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 {
-
+        printf("\nInside extract file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
         WORD key_schedule[60];
@@ -257,25 +260,25 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         long *fileLength = extractFileLength(archiveFile, key_schedule);
         long lengthCounter = *fileLength;
 
-        char testName[128];
         printf("decrypted file name length: %d\n", *fileNameLength);
-        strncpy(testName, fileName, *fileNameLength); 
         printf("original name: %s\n", newFileName);
         printf("decrypted name: %s\n", fileName);
+        printf("file length: %ld\n", lengthCounter);
 
         if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
-                printf("file name does not match\n");
                 die("file name does not match");
         }
 
         // Read in 16 bytes
-        while ((n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
+        while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
                 
                 aes_decrypt(buf, dec_buf, key_schedule, 256);
+
                 
                 if (lengthCounter <= 16) {
                         if ((fwrite(dec_buf, 1, lengthCounter, newFile)) != lengthCounter) {
-                                die("write failed leftover write\n");
+                                printf("decrypted: %s\n", dec_buf);
+                                die("write failed in leftover write\n");
                         }
                 } else {
                         if ((fwrite(dec_buf, 1, n, newFile)) != n) {
@@ -293,8 +296,7 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-
-        fclose(archiveFile);
+        printf("exiting extract file\n");
         fclose(newFile);
 }
 
@@ -307,6 +309,56 @@ int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
 
         return passIsValid == 0;
 }
+
+long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, long archiveSize)
+{
+        WORD key_schedule[60];
+        aes_key_setup(hash_pass, key_schedule, 256);
+
+        int passIsValid;
+        int *fileNameLength;
+        char *fileName; 
+        long *fileLength; 
+        long lengthCounter;
+
+        int metadataSize = 16+16+128+16;
+        long offset = 0;
+        int found = 0;
+
+        while(offset <= archiveSize) {                
+
+                printf("\n");
+                printf("in while loop\n");
+
+                passIsValid = extractPasswordCheck(archiveFile, key_schedule);
+                fileNameLength = extractFileNameLength(archiveFile, key_schedule);
+                fileName = extractFileName(archiveFile, key_schedule);
+                fileLength = extractFileLength(archiveFile, key_schedule);
+                lengthCounter = *fileLength;
+        
+                printf("file name: %s\n", fileName);
+                printf("file length: %ld\n", lengthCounter);
+
+                if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0) {
+                        printf("found one\n");
+                        printf("\n");
+                        fseek(archiveFile, -(long)metadataSize, SEEK_CUR);
+                        printf("exiting findInArchive\n");
+                        return offset;
+                }              
+           
+                int roundup = 0;
+                while (roundup < lengthCounter) {
+                        roundup += 16;
+                }
+
+                fseek(archiveFile, roundup, SEEK_CUR);
+                offset += metadataSize;
+                offset += roundup;
+        }
+        return -1;
+}
+
 
 void checkFileNameReq(char *newFileName)
 {
@@ -372,9 +424,11 @@ int main(int argc, char *argv[])
         FILE *archive_fp = NULL;
         FILE *newFile_fp = NULL;
         struct stat archive_st;
-        //struct stat addFile_st;
+        struct stat addFile_st;
         long addFileSize;
+        long archiveFileSize;
         int newArchive;
+        int passCount = 0;
 
         if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode)) {
                 die("Not a file");
@@ -382,11 +436,13 @@ int main(int argc, char *argv[])
 
         // ******** CHECK THAT THE ARCHIVE IS NOT EMPTY
 
-        /*if (stat(newFile_name, &addFile_st) == 0 && S_ISDIR(addFile_st.st_mode)) {
-                die("Not a file");
-        }*/
-        
+       
         while (newFile_name = *argv++) {
+                
+                //you dont need to check for extract, only for add but does access cover this?
+                /*if (stat(newFile_name, &addFile_st) == 0 && S_ISDIR(addFile_st.st_mode)) {
+                        die("Not a file");
+                }*/ 
         
                 checkFileNameReq(newFile_name);
         
@@ -446,9 +502,15 @@ int main(int argc, char *argv[])
                 } else if ((strcmp(func_name, "extract")) == 0) {
                         if (access(archive_name, F_OK) == 0) {
                                 
-                                archive_fp = fopen(archive_name, "rb");
-                                if (archive_fp == NULL) {
-                                        die("open failed");
+                                if (passCount == 0) {
+                                        archive_fp = fopen(archive_name, "rb");
+                                        if (archive_fp == NULL) {
+                                                die("open failed");
+                                        }
+
+                                        fseek(archive_fp, 0, SEEK_END);
+                                        archiveFileSize = ftell(archive_fp) - 1;
+                                        fseek(archive_fp, 0, SEEK_SET);
                                 }
 
                                 int newFileNameLength = strlen(newFile_name);
@@ -456,9 +518,11 @@ int main(int argc, char *argv[])
                                 int newFileExtLength = strlen(nameExt);
 
                                 char decFileName[newFileNameLength + newFileExtLength + 1];
-                                strncpy(decFileName, newFile_name, newFileNameLength);
+                                strncpy(decFileName, newFile_name, newFileNameLength + 1);
                                 strncat(decFileName, nameExt, newFileExtLength);
 
+                                printf("\n");
+                                printf("original file name: %s\n", newFile_name);
                                 printf("original file name length: %d\n", newFileNameLength);
                                 printf("dec file name: %s\n", decFileName);
 
@@ -467,17 +531,26 @@ int main(int argc, char *argv[])
                                         die("open failed");
                                 }
 
+                                long testCount = ftell(archive_fp);
+                                long temp = 16 + 128 + 16 +16 + 32;
+                                //printf("diff: %ld\n", testCount - temp);
+
                                 if (keyIsValid(archive_fp, hash_pass)) {
 
                                         fseek(archive_fp, 0, SEEK_SET);
+
+                                        long offset = findInArchive(archive_fp, hash_pass, newFile_name, archiveFileSize);
+
+                                        if (offset < 0)
+                                                die("File not in archive");
 
                                         extractFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
                                 } else {
                                         die("Wrong password");
                                 
                                 }
-
-
+        
+                                passCount++;
 
 	                } else {
                                
@@ -492,5 +565,6 @@ int main(int argc, char *argv[])
                 
 
 func_end: 
+        fclose(archive_fp);
 	return 0;
 }
