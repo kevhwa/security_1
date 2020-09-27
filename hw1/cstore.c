@@ -60,10 +60,13 @@ void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_sche
 {
 
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
-        char byte_buff[16];
-        int intArray[4];
+        char *byte_buff = malloc(16);
+        int *intArray = malloc(16);
         size_t n;
         intArray[0] = deleteMarker;
+        intArray[1] = deleteMarker;
+        intArray[2] = deleteMarker;
+        intArray[3] = deleteMarker;
 
         //encrypt length and write into archive
         memcpy(byte_buff, intArray, 16);
@@ -73,6 +76,8 @@ void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_sche
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
+
+        printf("delete file marker set to: %d\n", intArray[0]);
 }
 
 void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
@@ -227,7 +232,6 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
         char byte_buff[MAX_ENCRYPT_BLOCK_BYTES];
         char *fileName = malloc(128);
 
-
         for (int i = 0; i < (128/16); i++) {
                if ((n = fread(byte_buff, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) < 0) {
                die("read failed");
@@ -338,7 +342,7 @@ void extractFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFi
         fclose(newFile);
 }
 
-void deleteFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFileName)
+void deleteFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[])
 {
         printf("\nInside delete file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -350,61 +354,33 @@ void deleteFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], char *newFil
         aes_key_setup(hash_pass, key_schedule, 256);
 
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
-        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
-        char *fileName = extractFileName(archiveFile, key_schedule);
-        long *fileLength = extractFileLength(archiveFile, key_schedule);
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule); //16
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule); //16
+        char *fileName = extractFileName(archiveFile, key_schedule); //128
+        long *fileLength = extractFileLength(archiveFile, key_schedule); //16
         long lengthCounter = *fileLength;
 
-        printf("decrypted file name length: %d\n", *fileNameLength);
-        printf("original name: %s\n", newFileName);
-        printf("decrypted name: %s\n", fileName);
-        printf("file length: %ld\n", lengthCounter);
+        //printf("decrypted file name length: %d\n", *fileNameLength);
+        //printf("original name: %s\n", newFileName);
+        //printf("decrypted name: %s\n", fileName);
+        //printf("file length: %ld\n", lengthCounter);
 
-        long offset = 16*4;
-        fseek(archiveFile, -offset, SEEK_CUR);
-        encryptDeleteFileMarker(archiveFile, 1, key_schedule); 
+        long offset = 16 + 16 + 16 + 128;
+        fseek(archiveFile,0 - offset, SEEK_CUR);
+        //printf("fseek success\n");
+        
+        int deleteMark = 1;
+        encryptDeleteFileMarker(archiveFile, deleteMark, key_schedule); 
        
-        
-        
-        
-        
-        
-        
-        
-        /*if (strncmp(newFileName, fileName, *fileNameLength) != 0) {
-                die("file name does not match");
-        }*/
-
-        // Read in 16 bytes
-        /*while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
-                
-                aes_decrypt(buf, dec_buf, key_schedule, 256);
-
-                
-                if (lengthCounter <= 16) {
-                        if ((fwrite(dec_buf, 1, lengthCounter, newFile)) != lengthCounter) {
-                                printf("decrypted: %s\n", dec_buf);
-                                die("write failed in leftover write\n");
-                        }
-                } else {
-                        if ((fwrite(dec_buf, 1, n, newFile)) != n) {
-                                die("write failed\n");
-                        }
-
-                }
-                lengthCounter -= n;
-        }*/
-        
         free(fileNameLength);
         free(fileName);
         free(fileLength);
+        
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-        printf("exiting extract file\n");
-        fclose(newFile);
+        printf("exiting delete file\n");
 }
 
 int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
@@ -433,10 +409,9 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         long offset = 0;
         int found = 0;
 
-        while(offset <= archiveSize) {                
+        printf("\ninside findinarchive\n");
 
-                printf("\n");
-                printf("in while loop\n");
+        while(offset <= archiveSize) {                
 
                 passIsValid = extractPasswordCheck(archiveFile, key_schedule);
                 fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
@@ -445,17 +420,20 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 fileLength = extractFileLength(archiveFile, key_schedule);
                 lengthCounter = *fileLength;
         
-                printf("file name: %s\n", fileName);
+                printf("original file name: %s\n", targetFileName);
+                printf("dec file name: %s\n", fileName);
                 printf("file length: %ld\n", lengthCounter);
-                printf("deleted file: %d\n", *fileDeleteMarker_ptr);
+                printf("deleted file: %d\n", fileDeleteMarker_ptr[0]);
 
-                if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0 && (*fileDeleteMarker_ptr == 0)) {
+                if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0 && (fileDeleteMarker_ptr[0] == 0)) {
                         printf("found one\n");
                         printf("\n");
                         fseek(archiveFile, -(long)metadataSize, SEEK_CUR);
                         printf("exiting findInArchive\n");
                         return offset;
-                }              
+                } else if (fileDeleteMarker_ptr[0] == 1) {
+                        printf("file deleted from archive, skipping\n");
+                }
            
                 int roundup = 0;
                 while (roundup < lengthCounter) {
@@ -642,7 +620,7 @@ int main(int argc, char *argv[])
                                 strncpy(decFileName, newFile_name, newFileNameLength + 1);
                                 strncat(decFileName, nameExt, newFileExtLength);
 
-                                printf("\n");
+                                printf("\n inside main function \n");
                                 printf("original file name: %s\n", newFile_name);
                                 printf("original file name length: %d\n", newFileNameLength);
                                 printf("dec file name: %s\n", decFileName);
@@ -659,9 +637,11 @@ int main(int argc, char *argv[])
                                         long offset = findInArchive(archive_fp, hash_pass, newFile_name, archiveFileSize);
 
                                         if (offset < 0) {
-                                                printf("File not in archive\n");
+                                                printf("%s not in archive\n", newFile_name);
                                                 fclose(newFile_fp);
-                                                goto func_end;
+                                                fseek(archive_fp, 0, SEEK_SET);
+                                                passCount++;
+                                                continue;
                                         }
 
                                         extractFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
@@ -693,27 +673,8 @@ int main(int argc, char *argv[])
                                         archiveFileSize = ftell(archive_fp) - 1;
                                         fseek(archive_fp, 0, SEEK_SET);
                                 }
-
-                                /*int newFileNameLength = strlen(newFile_name);
-                                char nameExt[] = "-decrypted";
-                                int newFileExtLength = strlen(nameExt);
-
-                                char decFileName[newFileNameLength + newFileExtLength + 1];
-                                strncpy(decFileName, newFile_name, newFileNameLength + 1);
-                                strncat(decFileName, nameExt, newFileExtLength);*/
-
                                 printf("\n");
                                 printf("original file name: %s\n", newFile_name);
-                                //printf("original file name length: %d\n", newFileNameLength);
-                                //printf("dec file name: %s\n", decFileName);
-
-                                /*
-                                newFile_fp = fopen(decFileName, "wb+");
-                                if(newFile_fp == NULL) {
-                                        printf("open failed\n");
-                                        fclose(newFile_fp);
-                                        goto func_end;
-                                }*/
 
                                 if (keyIsValid(archive_fp, hash_pass)) {
                                         fseek(archive_fp, 0, SEEK_SET);
@@ -721,11 +682,11 @@ int main(int argc, char *argv[])
 
                                         if (offset < 0) {
                                                 printf("File not in archive\n");
-                                                fclose(newFile_fp);
+                                                //fclose(newFile_fp);
                                                 goto func_end;
                                         }
 
-                                        deleteFile(newFile_fp, archive_fp, hash_pass, newFile_name); 
+                                        deleteFile(newFile_fp, archive_fp, hash_pass); 
 
                                 } else {
                                         printf("Wrong password\n");
