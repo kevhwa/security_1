@@ -392,7 +392,6 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
 
                 aes_encryptCBC(buf, 16, enc_buf, key_schedule, 256, iv_buf);
                 memcpy(text, enc_buf, 16);
-                printf("doing genhmac\n");
                 BYTE *temp = genHMAC(key, text, HMAC_iv);
                 key = temp;
 
@@ -408,10 +407,6 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-        free(iv_buf);
-        free(HMAC_iv);
-        fclose(newFile);
-
         addList(list, fileName);
 
         int offset = (round * 16) + (16 * 5) + 128 + 32;
@@ -421,6 +416,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
                 die("write failed");
 
         free(key);
+        fclose(newFile);
 }
 
 int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
@@ -878,12 +874,26 @@ int main(int argc, char *argv[])
                                                         goto func_end;
                                                 }
                                                 newArchive = 1;
+
+                                                fclose(archive_fp);
+
                                                 
                                                 newList_fp = fopen(listName, "wb+");
                                                 if(newList_fp == NULL) {
                                                         die("fopen failed in main add1");
                                                 }
-
+                                                fclose(newList_fp);
+                                                
+                                                archive_fp = fopen(archive_name, "rb+");
+                                                if (archive_fp == NULL) {
+                                                        printf("open failed\n");
+                                                        goto func_end;
+                                                }
+                                                
+                                                newList_fp = fopen(listName, "rb+");
+                                                if(newList_fp == NULL) {
+                                                        die("fopen failed in main add1");
+                                                }
 
                                         } else {
                                                 archive_fp = fopen(archive_name, "rb+");
@@ -895,7 +905,7 @@ int main(int argc, char *argv[])
 
                                                 newList_fp = fopen(listName, "rb+");
                                                 if(newList_fp == NULL) {
-                                                        printf("fopen failed. Could be because archive file exists but not list file.\n");
+                                                        printf("fopen failed. Could be because archive file exists but not list file, which are always created together.\n");
                                                         goto func_end;
                                                 }
                                         }
@@ -921,8 +931,6 @@ int main(int argc, char *argv[])
                                         //Add space for archive IV and Code
                                         addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, addFileSize); 
                                         //addHMAC_Code(archive_fp);
-                                        fclose(newFile_fp);
-
                                         /*archive_fp = fopen(archive_name, "ab+");
                                         if (archive_fp == NULL) {
                                                 printf("open failed\n");
@@ -938,7 +946,6 @@ int main(int argc, char *argv[])
                                                 //addHMAC_Code(archive_fp);
                                                 fseek(archive_fp, 0, SEEK_SET);
                                         } else {
-                                                fclose(newFile_fp);
                                                 printf("Wrong password\n");
                                                 goto func_end;
                                 
@@ -951,6 +958,7 @@ int main(int argc, char *argv[])
                                 printf("***Updated archive size %ld***\n", archiveSize);
                                 
                                 passCount++;
+                                newArchive = 0;
 	                } else {
                                
                                printf("%s does not exist\n", newFile_name); 
