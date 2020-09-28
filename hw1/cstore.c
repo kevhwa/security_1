@@ -6,6 +6,7 @@
 #include <ctype.h> /* For isascii */
 #include <unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 // include others
 
 #define MAX_NAME_BUFF_BYTES 100 /* Maximum buffer for names */
@@ -14,7 +15,7 @@
 #define MAX_ENCRYPT_BLOCK_BITS 128
 #define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
-#define METADATA_BLOCKSIZE 192
+#define METADATA_BLOCKSIZE 208 // added 16 for plaintext IV
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
 struct listEntry {
@@ -60,22 +61,107 @@ void checkPassReq(char *password)
                 }        
 	}
 }
+// XORs the in and out buffers, storing the result in out. Length is in bytes.
+void xor_buf_func(const BYTE in[], BYTE out[], size_t len)
+{
+	size_t idx;
 
-void encryptPasswordCheck(FILE *archiveFile, WORD *key_schedule)
+	for (idx = 0; idx < len; idx++)
+		out[idx] ^= in[idx];
+}
+
+BYTE *genIV_16(void)
+{
+        srand(time(NULL));
+        int intIV[4];
+        BYTE *byteIV = malloc(16);
+
+        for (int i = 0; i < 4; i++) {
+                intIV[i] = rand();
+        }
+        memcpy(byteIV, intIV, sizeof(byteIV));
+        return byteIV;
+}
+
+BYTE *genIV_32(void)
+{
+        srand(time(NULL));
+        int intIV[8];
+        BYTE *byteIV = malloc(32);
+
+        for (int i = 0; i < 8; i++) {
+                intIV[i] = rand();
+        }
+        memcpy(byteIV, intIV, sizeof(byteIV));
+        return byteIV;
+}
+
+BYTE *genHMAC()
+{
+        BYTE ipad[32*8];
+        BYTE opad[32*8];
+        BYTE keyBuf[SHA256_BLOCK_SIZE];
+        memset(ipad, 0x36, 32);
+        memset(opad, 0x5C, 32);
+        BYTE *iv_buf = genIV_32();
+
+        sha256_CTX ctxIV;
+        sha256_init(&ctxIV);
+        sha256_update(&ctx, iv_buf, strlen(iv_buf));
+        sha256_final(&ctx, keyBuf);
+
+
+}
+
+
+int aes_encryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
+{
+	BYTE buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE], iv_buf[AES_BLOCK_SIZE];
+	int blocks, idx;
+
+	//if (in_len % AES_BLOCK_SIZE != 0)
+	//	return(FALSE);
+
+	blocks = in_len / AES_BLOCK_SIZE;
+
+	memcpy(iv_buf, iv, AES_BLOCK_SIZE);
+
+	for (idx = 0; idx < blocks; idx++) {
+		memcpy(buf_in, &in[idx * AES_BLOCK_SIZE], AES_BLOCK_SIZE);
+		xor_buf_func(iv_buf, buf_in, AES_BLOCK_SIZE);
+		aes_encrypt(buf_in, buf_out, key, keysize);
+		memcpy(&out[idx * AES_BLOCK_SIZE], buf_out, AES_BLOCK_SIZE);
+		memcpy(iv_buf, buf_out, AES_BLOCK_SIZE);
+	}
+
+	return 1;
+}
+
+void addIV(FILE *archiveFile, BYTE *iv_buf)
+{
+        size_t n;
+        
+        if ((n = fwrite(iv_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
+                die("write failed\n");
+        }
+}       
+
+
+void encryptPasswordCheck(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         char byte_buff[16];
         memset(byte_buff, 0, 16);
         size_t n;
 
-        aes_encrypt(passcode, enc_buf, key_schedule, 256);
+        aes_encryptCBC(passcode, 16, enc_buf, key_schedule, 256, iv_buf);
 
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
 }
 
-void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_schedule)
+void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_schedule, BYTE *iv_buf)
 {
 
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -88,14 +174,14 @@ void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_sche
         //encrypt length and write into archive
         memcpy(byte_buff, intArray, 16);
 
-        aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+        aes_encryptCBC(byte_buff, 16, enc_buf, key_schedule, 256, iv_buf);
 
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
 }
 
-void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
+void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         char byte_buff[16];
@@ -106,7 +192,7 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
 
                 memcpy(byte_buff, &fileName[i * 16], 16);
 
-                aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+                aes_encryptCBC(byte_buff, 16, enc_buf, key_schedule, 256, iv_buf);
 
                 if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                         die("write failed\n");
@@ -115,7 +201,7 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
         //printf("enc: file = %s\n", fileName);
 }
 
-void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_schedule)
+void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_schedule, BYTE *iv_buf)
 {
 
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -128,14 +214,14 @@ void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_sche
         //encrypt length and write into archive
         memcpy(byte_buff, intArray, 16);
 
-        aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+        aes_encryptCBC(byte_buff, 16, enc_buf, key_schedule, 256, iv_buf);
 
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
         }
 }
 
-void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
+void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule, BYTE *iv_buf)
 {
 
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -148,7 +234,7 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
         //encrypt length and write into archive
         memcpy(byte_buff, longArray, 16);
 
-        aes_encrypt(byte_buff, enc_buf, key_schedule, 256);
+        aes_encryptCBC(byte_buff, 16, enc_buf, key_schedule, 256, iv_buf);
 
         if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                 die("write failed\n");
@@ -187,22 +273,27 @@ void addList(FILE *list, char *fileName)
         }
 }
 
+
 void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
 
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
+        //BYTE iv_buf[MAX_ENCRYPT_BLOCK_BITS];
         WORD key_schedule[60];
         size_t n;
         char byte_buff[16];
 
         aes_key_setup(hash_pass, key_schedule, 256);
-        
-        encryptPasswordCheck(archiveFile, key_schedule);
-        encryptDeleteFileMarker(archiveFile, 0, key_schedule); 
-        encryptFileNameLength(archiveFile, fileNameLength, key_schedule);
-        encryptFileName(archiveFile, fileName, key_schedule); 
-        encryptFileLength(archiveFile, fileLength, key_schedule);
+        BYTE *iv_buf = genIV_16();
+
+        //Store IV first in plain text
+        addIV(archiveFile, iv_buf);
+        encryptPasswordCheck(archiveFile, key_schedule, iv_buf);
+        encryptDeleteFileMarker(archiveFile, 0, key_schedule, iv_buf); 
+        encryptFileNameLength(archiveFile, fileNameLength, key_schedule, iv_buf);
+        encryptFileName(archiveFile, fileName, key_schedule, iv_buf); 
+        encryptFileLength(archiveFile, fileLength, key_schedule, iv_buf);
 
         // Read in 16 bytes intervals
         while ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, newFile)) > 0) {
@@ -221,7 +312,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
                         memcpy(buf, byte_buff, MAX_ENCRYPT_BLOCK_BYTES);
                 }
 
-                aes_encrypt(buf, enc_buf, key_schedule, 256);
+                aes_encryptCBC(buf, 16, enc_buf, key_schedule, 256, iv_buf);
 
                 if ((n = fwrite(enc_buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile)) != MAX_ENCRYPT_BLOCK_BYTES) {
                         die("write failed\n");
@@ -233,13 +324,37 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-
+        free(iv_buf);
         fclose(newFile);
 
         addList(list, fileName);
 }
 
-int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
+int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
+{
+	BYTE buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE], iv_buf[AES_BLOCK_SIZE];
+	int blocks, idx;
+
+	//if (in_len % AES_BLOCK_SIZE != 0)
+	//	return(FALSE);
+
+	blocks = in_len / AES_BLOCK_SIZE;
+
+	memcpy(iv_buf, iv, AES_BLOCK_SIZE);
+
+	for (idx = 0; idx < blocks; idx++) {
+		memcpy(buf_in, &in[idx * AES_BLOCK_SIZE], AES_BLOCK_SIZE);
+		aes_decrypt(buf_in, buf_out, key, keysize);
+		xor_buf_func(iv_buf, buf_out, AES_BLOCK_SIZE);
+		memcpy(&out[idx * AES_BLOCK_SIZE], buf_out, AES_BLOCK_SIZE);
+		memcpy(iv_buf, buf_in, AES_BLOCK_SIZE);
+	}
+
+	return 1;
+}
+
+
+int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -251,13 +366,13 @@ int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
                 die("read failed");
         }
                 
-        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
         
         //printf("password check: %s\n", dec_buf);
         return strncmp(passcode, dec_buf, 16);
 }
 
-int *extractDeleteFileMarker(FILE *archiveFile, WORD *key_schedule)
+int *extractDeleteFileMarker(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -268,7 +383,7 @@ int *extractDeleteFileMarker(FILE *archiveFile, WORD *key_schedule)
                 die("read failed");
         }
                 
-        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
         
         int *fileMarker_ptr = malloc(sizeof(int));
         *fileMarker_ptr = *(int *)dec_buf;
@@ -276,7 +391,7 @@ int *extractDeleteFileMarker(FILE *archiveFile, WORD *key_schedule)
 }
 
 
-char *extractFileName(FILE *archiveFile, WORD *key_schedule)
+char *extractFileName(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -290,7 +405,7 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
                die("read failed");
                }
                 
-               aes_decrypt(byte_buff, dec_buf, key_schedule, 256);
+               aes_decryptCBC(byte_buff, 16, dec_buf, key_schedule, 256, iv_buf);
 
                if (i == 0) {
                        strncpy(fileName, dec_buf, 16);
@@ -301,7 +416,7 @@ char *extractFileName(FILE *archiveFile, WORD *key_schedule)
         return fileName;
 }
 
-int *extractFileNameLength(FILE *archiveFile, WORD *key_schedule)
+int *extractFileNameLength(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -312,14 +427,14 @@ int *extractFileNameLength(FILE *archiveFile, WORD *key_schedule)
                 die("read failed");
         }
                 
-        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
         
         int *fileNameLength = malloc(sizeof(int));
         *fileNameLength = *(int *)dec_buf;
         return fileNameLength;
 }
 
-long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
+long *extractFileLength(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -330,11 +445,21 @@ long *extractFileLength(FILE *archiveFile, WORD *key_schedule)
                 die("read failed");
         }
                 
-        aes_decrypt(buf, dec_buf, key_schedule, 256);
+        aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
         
         long *fileLength = malloc(sizeof(long));
         *fileLength = *(long *)dec_buf;
         return fileLength;
+}
+
+BYTE *extractIV(FILE *archiveFile)
+{
+        size_t n;
+        BYTE *buf = malloc(MAX_ENCRYPT_BLOCK_BYTES);
+        if (fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, archiveFile) != MAX_ENCRYPT_BLOCK_BYTES) {
+                die("Read failed");
+        }
+        return buf;
 }
 
 void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
@@ -348,11 +473,12 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
-        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
-        char *fileName = extractFileName(archiveFile, key_schedule);
-        long *fileLength = extractFileLength(archiveFile, key_schedule);
+        BYTE *iv_buf = extractIV(archiveFile);        
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
+        char *fileName = extractFileName(archiveFile, key_schedule, iv_buf);
+        long *fileLength = extractFileLength(archiveFile, key_schedule, iv_buf);
         long lengthCounter = *fileLength;
 
         //printf("decrypted file name length: %d\n", *fileNameLength);
@@ -376,7 +502,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         // Read in 16 bytes
         while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
                 
-                aes_decrypt(buf, dec_buf, key_schedule, 256);
+                aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
 
                 
                 if (lengthCounter <= 16) {
@@ -397,6 +523,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         free(fileNameLength);
         free(fileName);
         free(fileLength);
+        free(iv_buf);
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -417,11 +544,12 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule); //16
-        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule); //16
-        char *fileName = extractFileName(archiveFile, key_schedule); //128
-        long *fileLength = extractFileLength(archiveFile, key_schedule); //16
+        BYTE *iv_buf = extractIV(archiveFile);        
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf); //16
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf); //16
+        char *fileName = extractFileName(archiveFile, key_schedule, iv_buf); //128
+        long *fileLength = extractFileLength(archiveFile, key_schedule, iv_buf); //16
         long lengthCounter = *fileLength;
 
         long offset = 16 + 16 + 16 + 128;
@@ -429,13 +557,14 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         //printf("fseek success\n");
         
         int deleteMark = 1;
-        encryptDeleteFileMarker(archiveFile, deleteMark, key_schedule); 
+        encryptDeleteFileMarker(archiveFile, deleteMark, key_schedule, iv_buf); 
        
         printf("*****Successfully deleted %s*****\n", fileName);
         free(fileDeleteMarker_ptr);
         free(fileNameLength);
         free(fileName);
         free(fileLength);
+        free(iv_buf);
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -456,11 +585,12 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
 
         while(offset <= archiveSize) {                
 
-                int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-                int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule);
-                int *fileNameLength = extractFileNameLength(archiveFile, key_schedule);
-                char *fileName = extractFileName(archiveFile, key_schedule);
-                long* fileLength = extractFileLength(archiveFile, key_schedule);
+                BYTE *iv_buf = extractIV(archiveFile);        
+                int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
+                int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
+                int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
+                char *fileName = extractFileName(archiveFile, key_schedule, iv_buf);
+                long* fileLength = extractFileLength(archiveFile, key_schedule, iv_buf);
                 long lengthCounter = *fileLength;
         
                 printf("original file name: %s\n", targetFileName);
@@ -478,6 +608,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                         free(fileNameLength);
                         free(fileName);
                         free(fileLength);
+                        free(iv_buf);
  
                         return offset;
                 } else if (fileDeleteMarker_ptr[0] == 1) {
@@ -498,6 +629,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 free(fileNameLength);
                 free(fileName);
                 free(fileLength);
+                free(iv_buf);
         }
 
         printf("exiting findInArchive\n");
@@ -509,7 +641,8 @@ int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
         WORD key_schedule[60];
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
+        BYTE *iv_buf = extractIV(archiveFile);
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
 
         return passIsValid == 0;
 }
@@ -770,6 +903,6 @@ int main(int argc, char *argv[])
 
 func_end: 
         fclose(archive_fp);
-        fclose(newList_fp);
+        //fclose(newList_fp);
 	return 0;
 }
