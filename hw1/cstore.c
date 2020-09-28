@@ -17,6 +17,11 @@
 #define METADATA_BLOCKSIZE 192
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
+struct listEntry {
+        char name[128];
+        int count;
+};
+
 static void die(const char *message)
 {
 	perror(message);
@@ -153,7 +158,36 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
         //printf("\n");
 }
 
-void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
+void addList(FILE *list, char *fileName)
+{
+        size_t n;
+        char buf[sizeof(struct listEntry)];
+        int found = 0;
+
+        while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
+                struct listEntry *temp = (struct listEntry *)buf;
+                int tempCount = temp->count;
+                ++tempCount;
+                if (strncmp(temp->name, fileName, strlen(fileName)) == 0) {
+                        fseek(list, -sizeof(temp->count), SEEK_CUR);
+                        if (fwrite(&tempCount, 1, sizeof(temp->count), list) != sizeof(temp->count)) {
+                                die("write failed\n");
+                        }
+                        found = 1;
+                }
+        }
+
+        if (!found) {
+                struct listEntry *newEntry = malloc(sizeof(struct listEntry));
+                strncpy(newEntry->name, fileName, strlen(fileName));
+                newEntry->count = 1;
+
+                if (fwrite(newEntry, 1, sizeof(struct listEntry), list) != sizeof(struct listEntry))
+                        die("Write failed");
+        }
+}
+
+void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
 
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -201,6 +235,8 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLen
         } 
 
         fclose(newFile);
+
+        addList(list, fileName);
 }
 
 int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule)
@@ -396,6 +432,7 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         encryptDeleteFileMarker(archiveFile, deleteMark, key_schedule); 
        
         printf("*****Successfully deleted %s*****\n", fileName);
+        free(fileDeleteMarker_ptr);
         free(fileNameLength);
         free(fileName);
         free(fileLength);
@@ -529,6 +566,7 @@ int main(int argc, char *argv[])
         char *newFile_name;
         FILE *archive_fp = NULL;
         FILE *newFile_fp = NULL;
+        FILE *newList_fp = NULL;
         struct stat archive_st;
         struct stat addFile_st;
         long addFileSize;
@@ -539,6 +577,14 @@ int main(int argc, char *argv[])
         if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode)) {
                 die("Not a file");
         }
+
+        int newListNameLength = strlen(archive_name);
+        char nameExt[] = "-list";
+        int newListExtLength = strlen(nameExt);
+
+        char listName[newListNameLength + newListExtLength + 1];
+        strncpy(listName, archive_name, newListNameLength + 1);
+        strncat(listName, nameExt, newListExtLength);
 
         // ******** CHECK THAT THE ARCHIVE IS NOT EMPTY
 
@@ -566,6 +612,13 @@ int main(int argc, char *argv[])
                                                         goto func_end;
                                                 }
                                                 newArchive = 1;
+                                                
+                                                newList_fp = fopen(listName, "wb+");
+                                                if(newList_fp == NULL) {
+                                                        die("fopen failed");
+                                                }
+
+
                                         } else {
                                                 archive_fp = fopen(archive_name, "ab+");
                                                 if (archive_fp == NULL) {
@@ -573,6 +626,11 @@ int main(int argc, char *argv[])
                                                         goto func_end;
                                                 }
                                                 newArchive = 0;
+
+                                                newList_fp = fopen(listName, "rb+");
+                                                if(newList_fp == NULL) {
+                                                        die("fopen failed");
+                                                }
                                         }
                                 }
                                
@@ -593,7 +651,7 @@ int main(int argc, char *argv[])
                                 fileName[nameLength] = 0;
 
                                 if (newArchive) {
-                                        addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
+                                        addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, addFileSize); 
                                         fclose(archive_fp);
 
                                         archive_fp = fopen(archive_name, "ab+");
@@ -601,16 +659,17 @@ int main(int argc, char *argv[])
                                                 printf("open failed\n");
                                                 goto func_end;
                                         }
+
                                 } else {
                                         
                                         fseek(archive_fp,0,SEEK_SET);
                                         if (keyIsValid(archive_fp, hash_pass)) {
                                                 fseek(archive_fp, 0, SEEK_SET);
-                                                addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
+                                                addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, addFileSize); 
                                                 fseek(archive_fp, 0, SEEK_SET);
                                         } else {
                                                 fclose(newFile_fp);
-                                                printf("Wrong password");
+                                                printf("Wrong password\n");
                                                 goto func_end;
                                 
                                         }
@@ -624,8 +683,8 @@ int main(int argc, char *argv[])
                                 passCount++;
 	                } else {
                                
-                               printf("Specified file does not exist"); 
-                               goto func_end;
+                               printf("%s does not exist\n", newFile_name); 
+                               continue;
 	                }
                 } else if ((strcmp(func_name, "extract")) == 0) {
                         if (access(archive_name, F_OK) == 0) {
@@ -680,8 +739,6 @@ int main(int argc, char *argv[])
                                         archiveFileSize = ftell(archive_fp) - 1;
                                         fseek(archive_fp, 0, SEEK_SET);
                                 }
-                                printf("\n");
-                                printf("original file name: %s\n", newFile_name);
 
                                 if (keyIsValid(archive_fp, hash_pass)) {
                                         fseek(archive_fp, 0, SEEK_SET);
@@ -713,5 +770,6 @@ int main(int argc, char *argv[])
 
 func_end: 
         fclose(archive_fp);
+        fclose(newList_fp);
 	return 0;
 }
