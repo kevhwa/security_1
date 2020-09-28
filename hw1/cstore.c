@@ -28,7 +28,21 @@ char passcode[16] = "Valid key TRUE!!";
 // void checkFileNameValid
 // void fileLengthValid
 
-void checkPassValid(char *password)
+void checkFileNameReq(char *newFileName)
+{
+        if (strlen(newFileName) > 100) {
+                die("File name must be under 100 characters");
+        }
+
+	for(int i = 0; i < strlen(newFileName); i++) {
+		if(!isascii(newFileName[i])) {
+			die("ASCII characters only for file names");
+                }
+	}
+}
+
+
+void checkPassReq(char *password)
 {
 	int length;
 	if((length = strlen(password)) > MAX_PASS_BUFF_BYTES) {
@@ -93,7 +107,7 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule)
                         die("write failed\n");
                 }
         }
-        printf("enc: file = %s\n", fileName);
+        //printf("enc: file = %s\n", fileName);
 }
 
 void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_schedule)
@@ -135,8 +149,8 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule)
                 die("write failed\n");
         }
 
-        printf("enc: file length = %ld\n", fileLength);
-        printf("\n");
+        //printf("enc: file length = %ld\n", fileLength);
+        //printf("\n");
 }
 
 void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
@@ -179,6 +193,8 @@ void addFile(FILE *newFile, FILE *archiveFile, BYTE hash_pass[], int fileNameLen
                         die("write failed\n");
                 }
         }
+
+        printf("\n*****Sucessfully encrypted and added %s*****\n",fileName );
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -303,10 +319,10 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         long *fileLength = extractFileLength(archiveFile, key_schedule);
         long lengthCounter = *fileLength;
 
-        printf("decrypted file name length: %d\n", *fileNameLength);
+        //printf("decrypted file name length: %d\n", *fileNameLength);
         printf("original name: %s\n", newFileName);
         printf("decrypted name: %s\n", fileName);
-        printf("file length: %ld\n", lengthCounter);
+        //printf("file length: %ld\n", lengthCounter);
 
         int newFileNameLength = strlen(newFileName);
         char nameExt[] = "-decrypted";
@@ -329,7 +345,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
                 
                 if (lengthCounter <= 16) {
                         if ((fwrite(dec_buf, 1, lengthCounter, newFile_fp)) != lengthCounter) {
-                                printf("decrypted: %s\n", dec_buf);
+                                //printf("decrypted: %s\n", dec_buf);
                                 die("write failed in leftover write\n");
                         }
                 } else {
@@ -349,6 +365,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
+        printf("*****Successfully decrypted %s*****\n", newFileName);
         printf("exiting extract file\n");
         fclose(newFile_fp);
 }
@@ -378,6 +395,7 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         int deleteMark = 1;
         encryptDeleteFileMarker(archiveFile, deleteMark, key_schedule); 
        
+        printf("*****Successfully deleted %s*****\n", fileName);
         free(fileNameLength);
         free(fileName);
         free(fileLength);
@@ -386,16 +404,6 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
                 die("fread failed\n");
         } 
         printf("exiting delete file\n");
-}
-
-int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
-{
-        WORD key_schedule[60];
-        aes_key_setup(hash_pass, key_schedule, 256);
-
-        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
-
-        return passIsValid == 0;
 }
 
 long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, long archiveSize)
@@ -420,13 +428,12 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         
                 printf("original file name: %s\n", targetFileName);
                 printf("dec file name: %s\n", fileName);
-                printf("dec file name length: %d\n", fileNameLength[0]);
-                printf("file length: %ld\n", lengthCounter);
+                //printf("dec file name length: %d\n", fileNameLength[0]);
+                //printf("file length: %ld\n", lengthCounter);
                 printf("deleted file: %d\n", fileDeleteMarker_ptr[0]);
 
                 if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0 && (fileDeleteMarker_ptr[0] == 0)) {
-                        printf("found one\n");
-                        printf("\n");
+                        printf("Successfully found one %s\n", targetFileName);
                         fseek(archiveFile, -(long)metadataSize, SEEK_CUR);
                         printf("exiting findInArchive\n");
 
@@ -437,7 +444,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
  
                         return offset;
                 } else if (fileDeleteMarker_ptr[0] == 1) {
-                        printf("file deleted from archive, skipping\n");
+                        printf("%s deleted from archive, skipping\n", targetFileName);
                         printf("\n");
                 }
            
@@ -460,20 +467,16 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         return -1;
 }
 
-
-void checkFileNameReq(char *newFileName)
+int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
 {
-        if (strlen(newFileName) > 100) {
-                die("File name must be under 100 characters");
-        }
+        WORD key_schedule[60];
+        aes_key_setup(hash_pass, key_schedule, 256);
 
-	for(int i = 0; i < strlen(newFileName); i++) {
-		if(!isascii(newFileName[i])) {
-			die("ASCII characters only for file names");
-                }
-	}
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule);
 
+        return passIsValid == 0;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -508,10 +511,10 @@ int main(int argc, char *argv[])
 	// If password option is given
 	if(strcmp(pass_option, pass_opt) == 0) {
 		password = *argv++; // argv 3 -> 4
-		checkPassValid(password);
+		checkPassReq(password);
 	} else {
 		password = getpass("Please enter password");
-		checkPassValid(password);
+		checkPassReq(password);
 		argv++; //argv  3 -> 4
 	}
 
@@ -582,7 +585,6 @@ int main(int argc, char *argv[])
                                 fseek(newFile_fp, 0, SEEK_END);
                                 addFileSize = ftell(newFile_fp) - 1;
                                 fseek(newFile_fp, 0, SEEK_SET);
-                                //printf("file size %ld\n", addFileSize);
 
                                 char fileName[128];
                                 memset(fileName, 0, 128);
@@ -592,14 +594,20 @@ int main(int argc, char *argv[])
 
                                 if (newArchive) {
                                         addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
+                                        fclose(archive_fp);
+
+                                        archive_fp = fopen(archive_name, "ab+");
+                                        if (archive_fp == NULL) {
+                                                printf("open failed\n");
+                                                goto func_end;
+                                        }
                                 } else {
                                         
                                         fseek(archive_fp,0,SEEK_SET);
                                         if (keyIsValid(archive_fp, hash_pass)) {
-
                                                 fseek(archive_fp, 0, SEEK_SET);
-
                                                 addFile(newFile_fp, archive_fp, hash_pass, nameLength, fileName, addFileSize); 
+                                                fseek(archive_fp, 0, SEEK_SET);
                                         } else {
                                                 fclose(newFile_fp);
                                                 printf("Wrong password");
@@ -607,6 +615,12 @@ int main(int argc, char *argv[])
                                 
                                         }
                                 }
+                                fseek(archive_fp, 0, SEEK_END);
+                                long archiveSize = ftell(archive_fp) - 1;
+                                fseek(archive_fp, 0, SEEK_SET);
+                                
+                                printf("***Updated archive size %ld***\n", archiveSize);
+                                
                                 passCount++;
 	                } else {
                                
@@ -640,17 +654,15 @@ int main(int argc, char *argv[])
                                         }
 
                                         extractFile(archive_fp, hash_pass, newFile_name); 
+                                        fseek(archive_fp, 0, SEEK_SET);
 
                                 } else {
                                         printf("Wrong password\n");
-                                        fclose(newFile_fp);
                                         goto func_end;                               
                                 }        
                                 passCount++;
 	                } else {
-                               
                                 printf("Specified archive file does not exist\n");
-                                fclose(newFile_fp);
                                 goto func_end;
 	                }
 
@@ -677,11 +689,13 @@ int main(int argc, char *argv[])
 
                                         if (offset < 0) {
                                                 printf("File not in archive\n");
-                                                //fclose(newFile_fp);
-                                                goto func_end;
+                                                fseek(archive_fp, 0, SEEK_SET);
+                                                passCount++;
+                                                continue;
                                         }
 
                                         deleteFile(archive_fp, hash_pass); 
+                                        fseek(archive_fp, 0, SEEK_SET);
 
                                 } else {
                                         printf("Wrong password\n");
