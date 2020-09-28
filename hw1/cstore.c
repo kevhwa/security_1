@@ -176,7 +176,7 @@ int aes_encryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[],
 	return 1;
 }
 
-void addIV(FILE *archiveFile, BYTE *iv_buf)
+void addAES_IV(FILE *archiveFile, BYTE *iv_buf)
 {
         size_t n;
         
@@ -366,7 +366,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         //Store IV first in plain text
         addHMAC_iv(archiveFile, HMAC_iv); //32
         addHMAC_CodeSpace(archiveFile); //32
-        addIV(archiveFile, iv_buf); //16
+        addAES_IV(archiveFile, iv_buf); //16
         encryptPasswordCheck(archiveFile, key_schedule, iv_buf); //16
         encryptDeleteFileMarker(archiveFile, 0, key_schedule, iv_buf); //16
         encryptFileNameLength(archiveFile, fileNameLength, key_schedule, iv_buf); //16
@@ -422,6 +422,18 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
 
         free(key);
         fclose(newFile);
+///////////////////////////////////
+        FILE *temp = fopen("temp", "r+");
+        fwrite(HMAC_iv, 1, 32, temp);
+        fseek(temp, 0, SEEK_SET);
+        BYTE tempbuf[32*8];
+        fread(tempbuf, 1, 32, temp);
+
+        int test = memcmp(HMAC_iv, tempbuf, 32);
+        printf("test within add: %d\n");
+        
+        fclose(temp);
+        
 }
 
 int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
@@ -584,7 +596,7 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 {
         printf("\nInside checkFileHMAC file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
-        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        //BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE text[16*8];
         BYTE *key = NULL;
         WORD key_schedule[60];
@@ -633,11 +645,18 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
                 die("fread failed\n");
         } 
 
-        printf("round: %d\n", round);
-        printf("key: %s\n", key);
+        //printf("round: %d\n", round);
+        //printf("key: %s\n", key);
 
+        //FILE *temp = fopen("temp", "r");
+        //BYTE tempbuf[32];
+        //fread(tempbuf, 1, 32, temp);
 
-        printf("READ HMAC IV %s\n", HMAC_IV);
+        //int error1 = memcmp(HMAC_IV, tempbuf, 32);
+        //printf("read iv vs stored iv %d\n", error1);
+ 
+
+        //printf("READ HMAC IV %s\n", HMAC_IV);
 
         int memcmperror = 0;
         if((memcmperror = memcmp(key, HMAC_Code, 32)) != 0) {
@@ -738,7 +757,8 @@ int extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         printf("*****Successfully decrypted %s*****\n", newFileName);
         printf("exiting extract file\n");
         fclose(newFile_fp);
-
+        
+       
         if(memcmp(key, HMAC_Code, 32) != 0) {
                 free(key);
 
@@ -805,14 +825,14 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
 
         while(offset <= archiveSize) {                
 
-                BYTE *HMAC_IV = extractHMAC_IV(archiveFile);                
-                BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
-                BYTE *iv_buf = extractASE_IV(archiveFile);
-                int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
-                int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
-                int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
-                char *fileName = extractFileName(archiveFile, key_schedule, iv_buf);
-                long* fileLength = extractFileLength(archiveFile, key_schedule, iv_buf);
+                BYTE *HMAC_IV = extractHMAC_IV(archiveFile);    //32            
+                BYTE *HMAC_Code = extractHMAC_Code(archiveFile); //32
+                BYTE *iv_buf = extractASE_IV(archiveFile);      //16
+                int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf); //16
+                int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf); //16
+                int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf); //16
+                char *fileName = extractFileName(archiveFile, key_schedule, iv_buf); //128
+                long* fileLength = extractFileLength(archiveFile, key_schedule, iv_buf); //16
                 long lengthCounter = *fileLength;
         
                 printf("original file name: %s\n", targetFileName);
