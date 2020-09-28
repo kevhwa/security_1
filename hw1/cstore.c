@@ -414,6 +414,11 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         fseek(archiveFile, -offset, SEEK_CUR); //get you to HMAC code space
         if (fwrite(key, 1, 32, archiveFile) != 32)
                 die("write failed");
+                
+        
+        //printf("rounds: %d\n", round);        
+        //printf("written key: %s\n", key);
+        printf("ADDED HMAC IV: %s\n", HMAC_iv);
 
         free(key);
         fclose(newFile);
@@ -442,6 +447,10 @@ int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[],
 	return 1;
 }
 
+/*int checkFileHMAC(FILE *archiveFile) 
+{
+        BYTE *temp = genHMAC(key, text, HMAC_iv);
+}*/
 
 int extractPasswordCheck(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
 {
@@ -571,15 +580,91 @@ BYTE *extractHMAC_IV(FILE *archiveFile)
         return buf;
 }
 
-void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
+int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
+{
+        printf("\nInside checkFileHMAC file\n");
+        BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE text[16*8];
+        BYTE *key = NULL;
+        WORD key_schedule[60];
+        size_t n;
+        long offset = 0;
+
+        aes_key_setup(hash_pass, key_schedule, 256);
+
+        BYTE *HMAC_IV = extractHMAC_IV(archiveFile);
+        BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
+        BYTE *iv_buf = extractASE_IV(archiveFile);  
+        int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
+        int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
+        int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
+        char *fileName = extractFileName(archiveFile, key_schedule, iv_buf);
+        long *fileLength = extractFileLength(archiveFile, key_schedule, iv_buf);
+        long lengthCounter = *fileLength;
+
+        int roundup = 0; 
+        while (roundup < lengthCounter) {
+                roundup += 16;
+        }
+
+        printf("original name: %s\n", newFileName);
+        printf("decrypted name: %s\n", fileName);
+        int round = 0; //this is for a check, can remove later
+        // Read in 16 bytes
+        while (roundup > 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
+                memcpy(text, buf, 16);
+                BYTE *temp = genHMAC(key, text, HMAC_IV);
+                key = temp;
+                offset += n;
+                roundup -= n;
+                round++;
+        }
+        
+        free(fileDeleteMarker_ptr);
+        free(fileNameLength);
+        free(fileName);
+        free(fileLength);
+        free(iv_buf);
+        free(HMAC_IV);
+        free(HMAC_Code);
+
+        if (ferror(archiveFile)) {
+                die("fread failed\n");
+        } 
+
+        printf("round: %d\n", round);
+        printf("key: %s\n", key);
+
+
+        printf("READ HMAC IV %s\n", HMAC_IV);
+
+        int memcmperror = 0;
+        if((memcmperror = memcmp(key, HMAC_Code, 32)) != 0) {
+                printf("READ HMAC CODE VS RECALCULATED HMAC CODE: %d\n", memcmperror);
+                return -1;
+        }
+
+
+
+        fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
+        printf("*****Successfully decrypted %s HMAC *****\n", newFileName);
+        printf("exiting extract file\n");
+
+        return 1;
+}
+
+int extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 {
         printf("\nInside extract file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
+        BYTE text[16*8];
+        BYTE *key = NULL;
         WORD key_schedule[60];
         size_t n;
         int fileByteCount = 0;
-        
+
         aes_key_setup(hash_pass, key_schedule, 256);
 
         BYTE *HMAC_IV = extractHMAC_IV(archiveFile);
@@ -609,10 +694,19 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         if(newFile_fp == NULL) {
                 die("fopen failed");
         }
+                int roundup = 0;
+                while (roundup < lengthCounter) {
+                        roundup += 16;
+                }
+
 
         // Read in 16 bytes
         while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
-                
+ 
+                //memcpy(text, buf, 16);
+               // BYTE *temp = genHMAC(key, text, HMAC_IV);
+                //key = temp;
+               
                 aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
 
                 
@@ -644,6 +738,15 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         printf("*****Successfully decrypted %s*****\n", newFileName);
         printf("exiting extract file\n");
         fclose(newFile_fp);
+
+        if(memcmp(key, HMAC_Code, 32) != 0) {
+                free(key);
+
+                return -1;
+        }
+
+        free(key);
+        return 1;
 }
 
 void deleteFile(FILE *archiveFile, BYTE hash_pass[])
@@ -990,6 +1093,11 @@ int main(int argc, char *argv[])
                                                 continue;
                                         }
 
+                                        if(checkFileHMAC(archive_fp, hash_pass, newFile_name) != 1) {
+                                                printf("Archived file, %s, has been tampered with. Aborting process\n", newFile_name);   
+                                                goto func_end;
+
+                                        }
                                         extractFile(archive_fp, hash_pass, newFile_name); 
                                         fseek(archive_fp, 0, SEEK_SET);
 
