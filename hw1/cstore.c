@@ -15,7 +15,8 @@
 #define MAX_ENCRYPT_BLOCK_BITS 128
 #define MAX_ENCRYPT_BLOCK_BYTES 16
 #define HASH_ITR 100000
-#define METADATA_BLOCKSIZE 208 // added 16 for plaintext IV
+#define METADATA_BLOCKSIZE 272
+#define IVDATA_BLOCKSIZE 80
 // ******* CHECK OFF_T SIZE WITH INT OVERFLOW INTERACTION. MAYBE PUT EVERYTHING INTO INT AND CHECK THAT FILE SIZE CAN'T BE BIGGER THAN MAX INT SIZE;
 
 struct listEntry {
@@ -79,7 +80,7 @@ BYTE *genIV_16(void)
         for (int i = 0; i < 4; i++) {
                 intIV[i] = rand();
         }
-        memcpy(byteIV, intIV, sizeof(byteIV));
+        memcpy(byteIV, intIV, 16);
         return byteIV;
 }
 
@@ -92,7 +93,7 @@ BYTE *genIV_32(void)
         for (int i = 0; i < 8; i++) {
                 intIV[i] = rand();
         }
-        memcpy(byteIV, intIV, sizeof(byteIV));
+        memcpy(byteIV, intIV, 32);
         return byteIV;
 }
 
@@ -104,18 +105,23 @@ BYTE *genHMAC(BYTE *key, BYTE *text, BYTE *iv_buf)
         BYTE temp2[32*8];
         memset(ipad, 0x36, 32);
         memset(opad, 0x5C, 32);
-        memcpy(temp, key, 32);
-        memcpy(temp2, key, 32);
-        if(key == NULL) {
-                BYTE keyBuf[SHA256_BLOCK_SIZE];
+        
+        SHA256_CTX ctxIV;
+        BYTE *keyBuf;
 
-                SHA256_CTX ctxIV;
+        if(key == NULL) {
+
                 sha256_init(&ctxIV);
-                sha256_update(&ctxIV, iv_buf, strlen(iv_buf));
+                sha256_update(&ctxIV, iv_buf, 32);                
+                keyBuf = malloc(32);
+                memset(keyBuf, 0, 32);
                 sha256_final(&ctxIV, keyBuf);
                 key = keyBuf;
-        }        
+        }
 
+        memcpy(temp, key, 32);
+        memcpy(temp2, key, 32);
+       
         xor_buf_func(ipad, temp, 32); // keyBuf now holds the XOR
         BYTE textAppend[SHA256_BLOCK_SIZE + 16*8];
 
@@ -126,7 +132,7 @@ BYTE *genHMAC(BYTE *key, BYTE *text, BYTE *iv_buf)
         BYTE key1_buf[SHA256_BLOCK_SIZE];
         SHA256_CTX ctx1; 
         sha256_init(&ctx1);
-        sha256_update(&ctx1, textAppend, strlen(textAppend));
+        sha256_update(&ctx1, textAppend, 48);
         sha256_final(&ctx1, key1_buf);
 
         xor_buf_func(opad, temp2, 32); // keyBuf now holds the XOR
@@ -135,13 +141,12 @@ BYTE *genHMAC(BYTE *key, BYTE *text, BYTE *iv_buf)
         memcpy(textAppend2, temp2, 32);
         memcpy(textAppend2 + 32, key1_buf, 32);
 
-        BYTE *key2_buf = malloc(SHA256_BLOCK_SIZE);
         SHA256_CTX ctx2; 
         sha256_init(&ctx2);
-        sha256_update(&ctx2, textAppend2, strlen(textAppend2));
-        sha256_final(&ctx2, key2_buf);
+        sha256_update(&ctx2, textAppend2, 64);
+        sha256_final(&ctx2, key);
 
-        return key2_buf;
+        return key;
 }
 
 
@@ -149,6 +154,9 @@ int aes_encryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[],
 {
 	BYTE buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE], iv_buf[AES_BLOCK_SIZE];
 	int blocks, idx;
+        memset(buf_in, 0, MAX_ENCRYPT_BLOCK_BYTES);
+        memset(buf_out, 0, MAX_ENCRYPT_BLOCK_BYTES);
+        memset(iv_buf, 0, MAX_ENCRYPT_BLOCK_BYTES);
 
 	//if (in_len % AES_BLOCK_SIZE != 0)
 	//	return(FALSE);
@@ -183,6 +191,7 @@ void encryptPasswordCheck(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         char byte_buff[16];
         memset(byte_buff, 0, 16);
+        memset(enc_buf, 0, 16);
         size_t n;
 
         aes_encryptCBC(passcode, 16, enc_buf, key_schedule, 256, iv_buf);
@@ -198,7 +207,10 @@ void encryptDeleteFileMarker(FILE *archiveFile, int deleteMarker, WORD *key_sche
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         char byte_buff[16];
         int intArray[16];
+
         memset(intArray, 0, 16);
+        memset(enc_buf, 0, 16);
+        memset(byte_buff, 0, 16);
         size_t n;
         intArray[0] = deleteMarker;
 
@@ -217,7 +229,8 @@ void encryptFileName(FILE *archiveFile, char *fileName, WORD *key_schedule, BYTE
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         char byte_buff[16];
         size_t n;
-
+        memset(enc_buf, 0, 16);
+        memset(byte_buff, 0, 16);
         //Encrypt file name and write into archive
         for(int i = 0; i < 8; i++) {
 
@@ -241,7 +254,8 @@ void encryptFileNameLength(FILE *archiveFile, int fileNameLength, WORD *key_sche
         memset(intArray, 0, 16);
         size_t n;
         intArray[0] = fileNameLength;
-
+        memset(enc_buf, 0, 16);
+        memset(byte_buff, 0, 16);
         //encrypt length and write into archive
         memcpy(byte_buff, intArray, 16);
 
@@ -261,7 +275,8 @@ void encryptFileLength(FILE *archiveFile, long fileLength, WORD *key_schedule, B
         size_t n;
         longArray[0] = fileLength;
         longArray[1] = 0;
-
+        memset(enc_buf, 0, 16);
+        memset(byte_buff, 0, 16);
         //encrypt length and write into archive
         memcpy(byte_buff, longArray, 16);
 
@@ -331,7 +346,7 @@ void addHMAC_CodeSpace(FILE *archiveFile)
 
 void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
-
+        printf("\nIn addFile\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         //BYTE iv_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -341,15 +356,17 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         int round=0;
         BYTE *key = NULL;
         BYTE text[16*8];
-
+        memset(buf, 0, 16);        
+        memset(enc_buf, 0, 16);
+        
         aes_key_setup(hash_pass, key_schedule, 256);
         BYTE *iv_buf = genIV_16();
         BYTE *HMAC_iv = genIV_32();
         
         //Store IV first in plain text
-        addHMAC_iv(archiveFile, HMAC_iv);
+        addHMAC_iv(archiveFile, HMAC_iv); //32
         addHMAC_CodeSpace(archiveFile); //32
-        addIV(archiveFile, iv_buf); //32
+        addIV(archiveFile, iv_buf); //16
         encryptPasswordCheck(archiveFile, key_schedule, iv_buf); //16
         encryptDeleteFileMarker(archiveFile, 0, key_schedule, iv_buf); //16
         encryptFileNameLength(archiveFile, fileNameLength, key_schedule, iv_buf); //16
@@ -375,6 +392,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
 
                 aes_encryptCBC(buf, 16, enc_buf, key_schedule, 256, iv_buf);
                 memcpy(text, enc_buf, 16);
+                printf("doing genhmac\n");
                 BYTE *temp = genHMAC(key, text, HMAC_iv);
                 key = temp;
 
@@ -396,10 +414,10 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
 
         addList(list, fileName);
 
-        int offset = (round * 16) + (16 * 4) + 128 + 32;
+        int offset = (round * 16) + (16 * 5) + 128 + 32;
 
         fseek(archiveFile, -offset, SEEK_CUR); //get you to HMAC code space
-        if (fwrite(key, 1, strlen(key), archiveFile) != strlen(key))
+        if (fwrite(key, 1, 32, archiveFile) != 32)
                 die("write failed");
 
         free(key);
@@ -527,7 +545,7 @@ long *extractFileLength(FILE *archiveFile, WORD *key_schedule, BYTE *iv_buf)
         return fileLength;
 }
 
-BYTE *extractIV(FILE *archiveFile)
+BYTE *extractASE_IV(FILE *archiveFile)
 {
         size_t n;
         BYTE *buf = malloc(MAX_ENCRYPT_BLOCK_BYTES);
@@ -538,6 +556,16 @@ BYTE *extractIV(FILE *archiveFile)
 }
 
 BYTE *extractHMAC_Code(FILE *archiveFile)
+{
+        size_t n;
+        BYTE *buf = malloc(32);
+        if (fread(buf, 1, 32, archiveFile) != 32) {
+                die("Read failed");
+        }
+        return buf;
+}
+
+BYTE *extractHMAC_IV(FILE *archiveFile)
 {
         size_t n;
         BYTE *buf = malloc(32);
@@ -558,8 +586,9 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        BYTE *iv_buf = extractIV(archiveFile);  
+        BYTE *HMAC_IV = extractHMAC_IV(archiveFile);
         BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
+        BYTE *iv_buf = extractASE_IV(archiveFile);  
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
         int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
         int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
@@ -610,6 +639,8 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         free(fileName);
         free(fileLength);
         free(iv_buf);
+        free(HMAC_IV);
+        free(HMAC_Code);
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -630,8 +661,9 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        BYTE *iv_buf = extractIV(archiveFile);        
+        BYTE *HMAC_IV = extractHMAC_IV(archiveFile);
         BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
+        BYTE *iv_buf = extractASE_IV(archiveFile);        
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
         int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf); //16
         int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf); //16
@@ -652,6 +684,8 @@ void deleteFile(FILE *archiveFile, BYTE hash_pass[])
         free(fileName);
         free(fileLength);
         free(iv_buf);
+        free(HMAC_IV);
+        free(HMAC_Code);
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -672,8 +706,9 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
 
         while(offset <= archiveSize) {                
 
-                BYTE *iv_buf = extractIV(archiveFile);
+                BYTE *HMAC_IV = extractHMAC_IV(archiveFile);                
                 BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
+                BYTE *iv_buf = extractASE_IV(archiveFile);
                 int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
                 int *fileDeleteMarker_ptr = extractDeleteFileMarker(archiveFile, key_schedule, iv_buf);
                 int *fileNameLength = extractFileNameLength(archiveFile, key_schedule, iv_buf);
@@ -697,6 +732,8 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                         free(fileName);
                         free(fileLength);
                         free(iv_buf);
+                        free(HMAC_Code);
+                        free(HMAC_IV);
  
                         return offset;
                 } else if (fileDeleteMarker_ptr[0] == 1) {
@@ -718,6 +755,8 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 free(fileName);
                 free(fileLength);
                 free(iv_buf);
+                free(HMAC_IV);
+                free(HMAC_Code);
         }
 
         printf("exiting findInArchive\n");
@@ -729,8 +768,14 @@ int keyIsValid(FILE *archiveFile, BYTE *hash_pass)
         WORD key_schedule[60];
         aes_key_setup(hash_pass, key_schedule, 256);
 
-        BYTE *iv_buf = extractIV(archiveFile);
+        BYTE *HMAC_IV = extractHMAC_IV(archiveFile);
+        BYTE *HMAC_Code = extractHMAC_Code(archiveFile);
+        BYTE *iv_buf = extractASE_IV(archiveFile);
         int passIsValid = extractPasswordCheck(archiveFile, key_schedule, iv_buf);
+
+        free(HMAC_IV);
+        free(HMAC_Code);
+        free(iv_buf);
 
         return passIsValid == 0;
 }
@@ -834,9 +879,9 @@ int main(int argc, char *argv[])
                                                 }
                                                 newArchive = 1;
                                                 
-                                                newList_fp = fopen(listName, "rb+");
+                                                newList_fp = fopen(listName, "wb+");
                                                 if(newList_fp == NULL) {
-                                                        die("fopen failed in main add");
+                                                        die("fopen failed in main add1");
                                                 }
 
 
@@ -850,7 +895,8 @@ int main(int argc, char *argv[])
 
                                                 newList_fp = fopen(listName, "rb+");
                                                 if(newList_fp == NULL) {
-                                                        die("fopen failed in main add");
+                                                        printf("fopen failed. Could be because archive file exists but not list file.\n");
+                                                        goto func_end;
                                                 }
                                         }
                                 }
@@ -875,7 +921,7 @@ int main(int argc, char *argv[])
                                         //Add space for archive IV and Code
                                         addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, addFileSize); 
                                         //addHMAC_Code(archive_fp);
-                                        //fclose(archive_fp);
+                                        fclose(newFile_fp);
 
                                         /*archive_fp = fopen(archive_name, "ab+");
                                         if (archive_fp == NULL) {
