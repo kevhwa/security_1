@@ -1,10 +1,31 @@
+uni:jch2169
+hw: 1
+
+
+Uses
+- Archive files must be created using cstore program. If you supply an empty
+  file to serve as the archive, program will treat it is a valid archive
+  file just in case it may have been maliciously deleted or tampered with.
 
 
 Restrictions
 - In order to best control edge cases and possible security flaws, multiple
   restrictions have been built in for user input
 
+Security
+- For encryption, I utilize my implementation of AES CBC
+- For integrity protection, I utilize my implementation of HMAC. I followed
+  the protocol shown in ietf RFC2104. 
 
+- This program offers triple security
+  - After every add, extract and delete function, we update the HMAC of that
+    file stored in archive along with the entire archive
+  - Before every extract and delete, we verify that the archive HMAC is
+    valid and that every individual file's HMAC is valid
+  - Also stored in every file's metadata is a phrase. This decrypted phrase
+    is always checked as another layer of security. Although the phrase is
+    constant, the encryption would make it random even if the same phrase is
+    encrypted over and over again
 
 
 Add behavior
