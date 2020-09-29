@@ -320,16 +320,19 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
 
 void listList(FILE *list) //, int fileNameLength)
 {
+        printf("\nInside listList\n");
+        
         size_t n;
         char buf[sizeof(struct listEntry)];
 
         while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
                 struct listEntry *temp = (struct listEntry *)buf;
-                
                 if (temp->count > 0) {
                         printf("%s\n", temp->name);
                 }
         } 
+
+        printf("Exiting listList\n");
                 
 }
 
@@ -1088,17 +1091,19 @@ int main(int argc, char *argv[])
 
 	//If command is list, list and end
 	if(strcmp(func_name,func_list) == 0) {
-                //ONLY USED FOR LIST 
-        	int newListNameLengthTEMP = strlen(argv[2]);
+                //ONLY USED FOR LIST
+                printf("\nInside main list\n");
+        	int newListNameLengthTEMP = strlen(*argv);
                 char nameExtTEMP[] = "-list.txt";
                 int newListExtLengthTEMP = strlen(nameExtTEMP);
 
                 char listNameTEMP[newListNameLengthTEMP + newListExtLengthTEMP + 1];
-                strncpy(listNameTEMP, argv[2], newListNameLengthTEMP + 1);
+                strncpy(listNameTEMP, *argv, newListNameLengthTEMP + 1);
                 strncat(listNameTEMP, nameExtTEMP, newListExtLengthTEMP);
+                printf("archive name %s\n", *argv);
+                printf("list name %s\n", listNameTEMP);
 
-
-                if((access(argv[2], F_OK) == 0) && access(listNameTEMP, F_OK) == 0) {
+                if((access(*argv, F_OK) == 0) && access(listNameTEMP, F_OK) == 0) {
                         FILE *listFile_fp = fopen(listNameTEMP, "rb");
                         if(listFile_fp == NULL) {
                                 fclose(listFile_fp);
