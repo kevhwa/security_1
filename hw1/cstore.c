@@ -80,6 +80,7 @@ BYTE *genIV_16(void)
         for (int i = 0; i < 4; i++) {
                 intIV[i] = rand();
         }
+
         memcpy(byteIV, intIV, 16);
         return byteIV;
 }
@@ -91,9 +92,12 @@ BYTE *genIV_32(void)
         BYTE *byteIV = malloc(32);
 
         for (int i = 0; i < 8; i++) {
-                intIV[i] = rand();
+                intIV[i] = 4;
         }
+
         memcpy(byteIV, intIV, 32);
+        if (memcmp(byteIV, intIV, 32) == 0)
+                printf("the same in genIV");
         return byteIV;
 }
 
@@ -418,22 +422,59 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         
         //printf("rounds: %d\n", round);        
         //printf("written key: %s\n", key);
-        printf("ADDED HMAC IV: %s\n", HMAC_iv);
+        //printf("ADDED HMAC IV: %s\n", HMAC_iv);
 
         free(key);
         fclose(newFile);
+/*
+        printf("size of first hmac iv %d\n", strlen(HMAC_iv));
 ///////////////////////////////////
         FILE *temp = fopen("temp", "r+");
         fwrite(HMAC_iv, 1, 32, temp);
         fseek(temp, 0, SEEK_SET);
-        BYTE tempbuf[32*8];
-        fread(tempbuf, 1, 32, temp);
+        BYTE tempbuf[32];
+        if (fread(tempbuf, 1, 32, temp) != 32) {
+                die("fread failed here");
+        }
 
-        int test = memcmp(HMAC_iv, tempbuf, 32);
-        printf("test within add: %d\n");
+        BYTE tempbuf2[32];
+        memcpy(tempbuf2, tempbuf, 32);
+
+        FILE *temp20 = fopen("temp2", "r+");
+        fwrite(tempbuf, 1, 32, temp20);
+
+        //printf("size of second hmac iv %d\n", strlen(tempbuf));
+
+        if ( memcmp(HMAC_iv, tempbuf, 32) == 0)
+                printf("this is right beg\n");
+        int intIV[8];
+
+        for (int i = 0; i < 8; i++) {
+                intIV[i] = 4;
+        }
+
+        if (memcmp(HMAC_iv, intIV, 32) == 0)
+                printf("the same data in add\n");
+ 
+       if (memcmp(intIV, tempbuf, 32) == 0)
+                printf("something not wrong with fread\n");
+
+       if (memcmp(tempbuf, HMAC_iv,32) == 0)
+                printf("whats going on\n");
+
+
+        ///////
+        FILE *temp16 = fopen("16temp", "w+");
+        fwrite(iv_buf, 1, 16, temp16);
+        fseek(temp16, 0, SEEK_SET);
+        BYTE tempbuf16[16*8];
+        fread(tempbuf16, 1, 16, temp16);
         
+        if (memcmp(iv_buf, tempbuf16, 16) == 0)
+                printf("this is right\n");
+
         fclose(temp);
-        
+  */      
 }
 
 int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
@@ -632,7 +673,14 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
                 roundup -= n;
                 round++;
         }
-        
+ 
+        int memcmperror = 0;
+        if((memcmperror = memcmp(key, HMAC_Code, 32)) != 0) {
+                printf("READ HMAC CODE VS RECALCULATED HMAC CODE: %d\n", memcmperror);
+                return -1;
+        }
+
+       
         free(fileDeleteMarker_ptr);
         free(fileNameLength);
         free(fileName);
@@ -657,13 +705,6 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
  
 
         //printf("READ HMAC IV %s\n", HMAC_IV);
-
-        int memcmperror = 0;
-        if((memcmperror = memcmp(key, HMAC_Code, 32)) != 0) {
-                printf("READ HMAC CODE VS RECALCULATED HMAC CODE: %d\n", memcmperror);
-                return -1;
-        }
-
 
 
         fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
