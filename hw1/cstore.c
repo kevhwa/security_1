@@ -290,12 +290,12 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
         size_t n;
         char buf[sizeof(struct listEntry)];
         int found = 0;
-        printf("\nInside addlist\n");
+        //printf("\nInside addlist\n");
 
         while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
                 struct listEntry *temp = (struct listEntry *)buf;
-                printf("name of entry: %s\n", temp->name);
-                printf("count of entry: %d\n", temp->count);
+                //printf("name of entry: %s\n", temp->name);
+                //printf("count of entry: %d\n", temp->count);
                 if (strncmp(temp->name, fileName, strlen(temp->name)) == 0) {
                         fseek(list, -sizeof(temp->count), SEEK_CUR);
                         int tempCount = temp->count;
@@ -310,7 +310,7 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
         }
 
         if (!found) {
-                printf("Writing for the first time\n");
+                //printf("Writing for the first time\n");
                 struct listEntry *newEntry = malloc(sizeof(struct listEntry));
                 memset(newEntry, 0, sizeof(struct listEntry));
                 strncpy(newEntry->name, fileName, strlen(fileName));
@@ -328,7 +328,7 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
 
 void listList(FILE *list) //, int fileNameLength)
 {
-        printf("\nInside listList\n");
+        //printf("\nInside listList\n");
         
         size_t n;
         char buf[sizeof(struct listEntry)];
@@ -340,7 +340,7 @@ void listList(FILE *list) //, int fileNameLength)
                 }
         } 
 
-        printf("Exiting listList\n");
+        //printf("Exiting listList\n");
                 
 }
 
@@ -351,11 +351,11 @@ int deleteList(FILE *list, char *fileName) //, int fileNameLength)
         char buf[sizeof(struct listEntry)];
         int found = 0;
 
-        printf("\nInside delete list\n");
+        //printf("\nInside delete list\n");
         while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
                 struct listEntry *temp = (struct listEntry *)buf;
-                printf("file name: %s\n", temp->name);
-                printf("file count: %d\n", temp->count);
+                //printf("file name: %s\n", temp->name);
+                //printf("file count: %d\n", temp->count);
                 if (strncmp(temp->name, fileName, strlen(temp->name)) == 0 && temp->count > 0) {
                         fseek(list, -sizeof(temp->count), SEEK_CUR);
                         int tempCount = temp->count;
@@ -391,27 +391,7 @@ void addHMAC_CodeSpace(FILE *archiveFile)
                 die("write failed\n");
         }
 }
-/*
-void addHMAC_iv(FILE *archiveFile, BYTE *HMAC_iv)
-{
-        size_t n;
-        
-        if ((n = fwrite(HMAC_iv, 1, 32, archiveFile)) != 32) {
-                die("write failed\n");
-        }
-}
 
-void addHMAC_CodeSpace(FILE *archiveFile)
-{
-        size_t n;
-        char emptyBuf[32];
-        memset(emptyBuf, 0, 32);
-        
-        if ((n = fwrite(emptyBuf, 1, 32, archiveFile)) != 32) {
-                die("write failed\n");
-        }
-}
-*/
 void addArchiveHMAC_Space(FILE *archiveFile)
 {
         BYTE *HMAC_iv = genIV_32();
@@ -430,7 +410,7 @@ void addArchiveHMAC_Space(FILE *archiveFile)
 
 void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
-        printf("\nIn addFile\n");
+        //printf("\nIn addFile\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
         //BYTE iv_buf[MAX_ENCRYPT_BLOCK_BITS];
@@ -486,7 +466,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
                 round++;
         }
 
-        printf("\n*****Sucessfully encrypted and added %s*****\n",fileName );
+        printf("*****Successfully encrypted and added %s*****\n",fileName );
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -658,7 +638,7 @@ BYTE *extractHMAC_IV(FILE *archiveFile)
 
 int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[])
 {
-        printf("\nInside checkFileHMAC file\n");
+        //printf("\nInside checkFileHMAC file\n");
         
         WORD key_schedule[60];
         aes_key_setup(hash_pass, key_schedule, 256);
@@ -723,15 +703,15 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[])
         }
 
         //fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
-        printf("*****Successfully checked all file HMACs *****\n");
-        printf("exiting HMAC check file\n");
+        printf("\n*****Successfully validated all file HMACs *****\n");
+        //printf("exiting HMAC check file\n");
 
         return 1;
 }
 
 int checkArchiveHMAC(FILE *archiveFile)
 {
-        printf("\nInside check archive hmac file\n");
+        //printf("\nInside check archive hmac file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE text[16*8];
         size_t n;
@@ -764,8 +744,8 @@ int checkArchiveHMAC(FILE *archiveFile)
         free(HMAC_Code);
 
         //fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
-        printf("*****Successfully updated archive  HMAC *****\n");
-        printf("exiting update HMAC \n");
+        printf("\n*****Successfully validated archive HMAC *****\n");
+        //printf("exiting update HMAC \n");
 
         return 1;
 
@@ -773,7 +753,7 @@ int checkArchiveHMAC(FILE *archiveFile)
 
 void updateArchiveHMAC(FILE *archiveFile)
 {
-        printf("\nInside update archive hmac file\n");
+        //printf("\nInside update archive hmac file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE text[16*8];
         size_t n;
@@ -801,8 +781,8 @@ void updateArchiveHMAC(FILE *archiveFile)
         free(key);
         free(HMAC_IV);
 
-        printf("*****Successfully updated archive  HMAC *****\n");
-        printf("exiting update HMAC \n");
+        printf("*****Successfully updated archive HMAC *****\n");
+        //printf("exiting update HMAC \n");
 
         //return 1;
 
@@ -810,7 +790,7 @@ void updateArchiveHMAC(FILE *archiveFile)
 
 void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[])
 {
-        printf("\nInside update file hmac file\n");
+        //printf("\nInside update file hmac file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE text[16*8];
         size_t n;
@@ -866,8 +846,8 @@ void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[])
         free(HMAC_Code);
         free(key);
 
-        printf("*****Successfully updated file HMAC *****\n");
-        printf("exiting update file HMAC \n");
+        printf("*****Successfully updated all file HMAC *****\n");
+        //printf("exiting update file HMAC \n");
 
         //return 1;
 
@@ -875,7 +855,7 @@ void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[])
 
 void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 {
-        printf("\nInside extract file\n");
+        //printf("\nInside extract file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE text[16*8];
@@ -896,16 +876,16 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         long *fileLength = extractFileLength(archiveFile, key_schedule, iv_buf);
         long lengthCounter = *fileLength;
 
-        printf("original name: %s\n", newFileName);
-        printf("decrypted name: %s\n", fileName);
+        //printf("original name: %s\n", newFileName);
+        //printf("decrypted name: %s\n", fileName);
 
         int newFileNameLength = strlen(newFileName);
         char nameExt[] = "Decrypted-";
         int newFileExtLength = strlen(nameExt);
 
         char decFileName[newFileNameLength + newFileExtLength + 1];
-        strncpy(decFileName, nameExt, newFileNameLength + 1);
-        strncat(decFileName, newFileName, newFileExtLength);
+        strncpy(decFileName, nameExt, newFileExtLength + 1);
+        strncat(decFileName, newFileName, newFileNameLength);
 
         FILE *newFile_fp = fopen(decFileName, "wb+");
         if(newFile_fp == NULL) {
@@ -952,14 +932,14 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-        printf("*****Successfully decrypted %s*****\n", newFileName);
-        printf("exiting extract file\n");
+        printf("*****Successfully extracted %s*****\n", newFileName);
+        //printf("exiting extract file\n");
         
 }
 
 int deleteFile(FILE *archiveFile, BYTE hash_pass[], FILE *listFile, char *newFileName)
 {
-        printf("\nInside delete file\n");
+        //printf("\nInside delete file\n");
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE dec_buf[MAX_ENCRYPT_BLOCK_BITS];
         WORD key_schedule[60];
@@ -1003,7 +983,7 @@ int deleteFile(FILE *archiveFile, BYTE hash_pass[], FILE *listFile, char *newFil
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-        printf("exiting delete file\n");
+        //printf("exiting delete file\n");
         return 1;
 }
 
@@ -1016,7 +996,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
         long offset = 0;
         //int found = 0;
 
-        printf("\ninside findinarchive\n");
+        //printf("\ninside findinarchive\n");
 
         while(offset <= archiveSize) {                
 
@@ -1030,14 +1010,14 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 long* fileLength = extractFileLength(archiveFile, key_schedule, iv_buf); //16
                 long lengthCounter = *fileLength;
         
-                printf("original file name: %s\n", targetFileName);
-                printf("dec file name: %s\n", fileName);
-                printf("deleted file: %d\n", fileDeleteMarker_ptr[0]);
+                //printf("original file name: %s\n", targetFileName);
+                //printf("dec file name: %s\n", fileName);
+                //printf("deleted file: %d\n", fileDeleteMarker_ptr[0]);
 
                 if (strncmp(fileName, targetFileName, strlen(targetFileName)) == 0 && (fileDeleteMarker_ptr[0] == 0)) {
-                        printf("Successfully found one %s\n", targetFileName);
+                        //printf("Successfully found one %s\n", targetFileName);
                         fseek(archiveFile, -(long)metadataSize, SEEK_CUR);
-                        printf("exiting findInArchive\n");
+                        //printf("exiting findInArchive\n");
 
                         free(fileDeleteMarker_ptr);
                         free(fileNameLength);
@@ -1049,8 +1029,8 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
  
                         return offset;
                 } else if (fileDeleteMarker_ptr[0] == 1) {
-                        printf("%s deleted from archive, skipping\n", targetFileName);
-                        printf("\n");
+                        //printf("%s deleted from archive, skipping\n", targetFileName);
+                        //printf("\n");
                 }
            
                 long roundup = 0;
@@ -1071,7 +1051,7 @@ long findInArchive(FILE *archiveFile, BYTE *hash_pass, char *targetFileName, lon
                 free(HMAC_Code);
         }
 
-        printf("exiting findInArchive\n");
+        //printf("exiting findInArchive\n");
         return -1;
 }
 
@@ -1109,28 +1089,35 @@ int main(int argc, char *argv[])
 	//If command is list, list and end
 	if(strcmp(func_name,func_list) == 0) {
                 //ONLY USED FOR LIST
-                printf("\nInside main list\n");
-        	int newListNameLengthTEMP = strlen(*argv);
-                char nameExtTEMP[] = "-list.txt";
-                int newListExtLengthTEMP = strlen(nameExtTEMP);
+                //printf("\nInside main list\n");
+        	
+                char *theArchiveName;
+                while (theArchiveName = *argv++) {
+                
+                        int theArchiveNameLength = strlen(theArchiveName);
+                        char nameExtTEMP[] = "-list.txt";
+                        int newListExtLengthTEMP = strlen(nameExtTEMP);
 
-                char listNameTEMP[newListNameLengthTEMP + newListExtLengthTEMP + 1];
-                strncpy(listNameTEMP, *argv, newListNameLengthTEMP + 1);
-                strncat(listNameTEMP, nameExtTEMP, newListExtLengthTEMP);
-                printf("archive name %s\n", *argv);
-                printf("list name %s\n", listNameTEMP);
+                        char listNameTEMP[theArchiveNameLength + newListExtLengthTEMP + 1];
+                        strncpy(listNameTEMP, theArchiveName, theArchiveNameLength + 1);
+                        strncat(listNameTEMP, nameExtTEMP, newListExtLengthTEMP);
+                        //printf("archive name %s\n", *argv);
+                        //printf("list name %s\n", listNameTEMP);
 
-                if((access(*argv, F_OK) == 0) && access(listNameTEMP, F_OK) == 0) {
-                        FILE *listFile_fp = fopen(listNameTEMP, "rb");
-                        if(listFile_fp == NULL) {
+                        if((access(theArchiveName, F_OK) == 0) && access(listNameTEMP, F_OK) == 0) {
+                                FILE *listFile_fp = fopen(listNameTEMP, "rb");
+                                if(listFile_fp == NULL) {
+                                        fclose(listFile_fp);
+                                        die("open failed\n");
+                                }
+                                printf("*****Current files in %s*****\n", theArchiveName); 
+        		        listList(listFile_fp);
                                 fclose(listFile_fp);
-                                die("open failed\n");
+		        } else {
+                                printf("Cannot access either archive file or list file\n");
+                                return 0;
                         }
- 
-        		listList(listFile_fp);
-                        fclose(listFile_fp);
-		}
-
+                }
 		return 0;
 	}
 
@@ -1159,9 +1146,9 @@ int main(int argc, char *argv[])
 		//password = malloc(32);
                 //memcpy(password, getpass("Please enter password"),32);
                 password = getpass("Please enter password"),
-                printf("entered pass: %s\n", password);
+                //printf("entered pass: %s\n", password);
 		checkPassReq(password);
-                printf("passed checkpassReq\n");
+                //printf("passed checkpassReq\n");
                 archive_name = pass_option;
                 //password[31] = 0;
                 sha256_init(&ctx);
@@ -1172,7 +1159,6 @@ int main(int argc, char *argv[])
                 free(password);
  
 	}
-        printf("step 1\n");
 	// Verify if archive file exists. If it does, check pass. Otherwise create
         char *newFile_name;
         FILE *archive_fp = NULL;
@@ -1189,7 +1175,6 @@ int main(int argc, char *argv[])
                 die("Not a file");
         }
 
-        printf("step 3\n");
         int newListNameLength = strlen(archive_name);
         char nameExt[] = "-list.txt";
         int newListExtLength = strlen(nameExt);
@@ -1200,7 +1185,6 @@ int main(int argc, char *argv[])
 
         // ******** CHECK THAT THE ARCHIVE IS NOT EMPTY
 
-        printf("step 4\n");
         while (newFile_name = *argv++) {
                 
                 //you dont need to check for extract, only for add but does access cover this?
@@ -1315,10 +1299,10 @@ int main(int argc, char *argv[])
                                         }
                                 }
                                 fseek(archive_fp, 0, SEEK_END);
-                                long archiveSize = ftell(archive_fp) - 1;
+                                long archiveSize = ftell(archive_fp);
                                 fseek(archive_fp, 0, SEEK_SET);
                                 
-                                printf("***Updated archive size %ld***\n", archiveSize);
+                                //printf("***Updated archive size %ld***\n", archiveSize);
                                 
                                 passCount++;
                                 newArchive = 0;
@@ -1341,7 +1325,7 @@ int main(int argc, char *argv[])
                                         }
 
                                         fseek(archive_fp, 0, SEEK_END);
-                                        archiveFileSize = ftell(archive_fp) - 1 - ARCHIVE_HMAC_BLOCKSIZE;
+                                        archiveFileSize = ftell(archive_fp) - ARCHIVE_HMAC_BLOCKSIZE;
                                         fseek(archive_fp, 0, SEEK_SET);
                                 }
 
@@ -1399,7 +1383,7 @@ int main(int argc, char *argv[])
                                         }
 
                                         fseek(archive_fp, 0, SEEK_END);
-                                        archiveFileSize = ftell(archive_fp) - 1 - ARCHIVE_HMAC_BLOCKSIZE;
+                                        archiveFileSize = ftell(archive_fp) - ARCHIVE_HMAC_BLOCKSIZE;
                                         fseek(archive_fp, 0, SEEK_SET);
                                 }
                                 // can cancel once you implment hmac for archive
@@ -1456,7 +1440,7 @@ int main(int argc, char *argv[])
                 
 
 func_end: 
-        if ((strcmp(func_name, "add")) == 0 || (strcmp(func_name, "add")) == 0) 
+        if ((strcmp(func_name, "add")) == 0 || (strcmp(func_name, "delete")) == 0) 
                 fclose(newList_fp);
 func_extract_end:        
         fclose(archive_fp);
