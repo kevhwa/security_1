@@ -152,7 +152,6 @@ BYTE *genHMAC(BYTE *key, BYTE *text, BYTE *iv_buf)
         return key;
 }
 
-
 int aes_encryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[], int keysize, const BYTE iv[])
 {
 	BYTE buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE], iv_buf[AES_BLOCK_SIZE];
@@ -291,13 +290,18 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
         size_t n;
         char buf[sizeof(struct listEntry)];
         int found = 0;
+        printf("\nInside addlist\n");
 
         while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
                 struct listEntry *temp = (struct listEntry *)buf;
+                printf("name of entry: %s\n", temp->name);
+                printf("count of entry: %d\n", temp->count);
                 if (strncmp(temp->name, fileName, strlen(temp->name)) == 0) {
                         fseek(list, -sizeof(temp->count), SEEK_CUR);
                         int tempCount = temp->count;
                         tempCount++;
+                        //char strCount[4];
+                        //snprintf(strCount, 4, "%d", tempCount);
                         if (fwrite(&tempCount, 1, sizeof(temp->count), list) != sizeof(temp->count)) {
                                 die("write failed\n");
                         }
@@ -306,10 +310,14 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
         }
 
         if (!found) {
+                printf("Writing for the first time\n");
                 struct listEntry *newEntry = malloc(sizeof(struct listEntry));
                 memset(newEntry, 0, sizeof(struct listEntry));
                 strncpy(newEntry->name, fileName, strlen(fileName));
                 newEntry->count = 1;
+
+                //char strCount[4];
+                //snprintf(strCount, 4, "%d", tempCount);
 
                 if (fwrite(newEntry, 1, sizeof(struct listEntry), list) != sizeof(struct listEntry))
                         die("Write failed");
@@ -343,8 +351,11 @@ int deleteList(FILE *list, char *fileName) //, int fileNameLength)
         char buf[sizeof(struct listEntry)];
         int found = 0;
 
+        printf("\nInside delete list\n");
         while ((n = fread(buf, 1, sizeof(struct listEntry), list)) > 0) {
                 struct listEntry *temp = (struct listEntry *)buf;
+                printf("file name: %s\n", temp->name);
+                printf("file count: %d\n", temp->count);
                 if (strncmp(temp->name, fileName, strlen(temp->name)) == 0 && temp->count > 0) {
                         fseek(list, -sizeof(temp->count), SEEK_CUR);
                         int tempCount = temp->count;
@@ -485,6 +496,7 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         if (fwrite(key, 1, 32, archiveFile) != 32)
                 die("write failed");
 */
+        fseek(list, 0, SEEK_SET);
         addList(list, fileName);
         //free(key);
         free(iv_buf);
@@ -977,6 +989,7 @@ int deleteFile(FILE *archiveFile, BYTE hash_pass[], FILE *listFile, char *newFil
         free(HMAC_IV);
         free(HMAC_Code);
 
+        fseek(listFile, 0, SEEK_SET);
         int error = deleteList(listFile, newFileName);
         if (error < 0)
                 return -1;
@@ -1122,27 +1135,41 @@ int main(int argc, char *argv[])
 	char *pass_option = *argv++; //argv = 3
 	char pass_opt[] = "-p\0";
 	char *password;
-
+        char *archive_name; // argv 4 -> 5
+        
         SHA256_CTX ctx;
         BYTE hash_pass[SHA256_BLOCK_SIZE];
 	// If password option is given
 	if(strcmp(pass_option, pass_opt) == 0) {
 		password = *argv++; // argv 3 -> 4
 		checkPassReq(password);
-	} else {
-		password = getpass("Please enter password");
-		checkPassReq(password);
-		argv++; //argv  3 -> 4
-	}
+                archive_name = *argv++;
 
-        sha256_init(&ctx);
-        for (int i = 0; i < HASH_ITR; ++i) {
-                sha256_update(&ctx, password, strlen(password));
-        }
-        sha256_final(&ctx, hash_pass);
-	
+                sha256_init(&ctx);
+                for (int i = 0; i < HASH_ITR; ++i) {
+                        sha256_update(&ctx, password, strlen(password));
+                }
+                sha256_final(&ctx, hash_pass);
+
+	} else {
+		//password = malloc(32);
+                //memcpy(password, getpass("Please enter password"),32);
+                password = getpass("Please enter password"),
+                printf("entered pass: %s\n", password);
+		checkPassReq(password);
+                printf("passed checkpassReq\n");
+                archive_name = pass_option;
+                //password[31] = 0;
+                sha256_init(&ctx);
+                for (int i = 0; i < HASH_ITR; ++i) {
+                        sha256_update(&ctx, password, strlen(password));
+                }
+                sha256_final(&ctx, hash_pass);
+                free(password);
+ 
+	}
+        printf("step 1\n");
 	// Verify if archive file exists. If it does, check pass. Otherwise create
-	char *archive_name = *argv++; // argv 4 -> 5
         char *newFile_name;
         FILE *archive_fp = NULL;
         FILE *newFile_fp = NULL;
@@ -1158,6 +1185,7 @@ int main(int argc, char *argv[])
                 die("Not a file");
         }
 
+        printf("step 3\n");
         int newListNameLength = strlen(archive_name);
         char nameExt[] = "-list.txt";
         int newListExtLength = strlen(nameExt);
@@ -1168,7 +1196,7 @@ int main(int argc, char *argv[])
 
         // ******** CHECK THAT THE ARCHIVE IS NOT EMPTY
 
-       
+        printf("step 4\n");
         while (newFile_name = *argv++) {
                 
                 //you dont need to check for extract, only for add but does access cover this?
@@ -1259,6 +1287,7 @@ int main(int argc, char *argv[])
                                         fseek(archive_fp, -(roundup + METADATA_BLOCKSIZE), SEEK_CUR);
                                         updateFileHMAC(archive_fp, hash_pass);
 
+
                                 } else {
                                         
                                         fseek(archive_fp, 0, SEEK_SET);
@@ -1276,6 +1305,7 @@ int main(int argc, char *argv[])
                                                 updateFileHMAC(archive_fp, hash_pass);
                                         } else {
                                                 printf("Wrong password\n");
+                                                fclose(newFile_fp);
                                                 goto func_end;
                                 
                                         }
@@ -1290,6 +1320,7 @@ int main(int argc, char *argv[])
                                 newArchive = 0;
                                 fseek(archive_fp, 0, SEEK_SET);
                                 updateArchiveHMAC(archive_fp);
+                                
 	                } else {
                                
                                printf("%s does not exist\n", newFile_name); 
@@ -1302,7 +1333,7 @@ int main(int argc, char *argv[])
                                         archive_fp = fopen(archive_name, "rb+");
                                         if (archive_fp == NULL) {
                                                 printf("open failed\n");
-                                                goto func_end;
+                                                goto func_extract_end;
                                         }
 
                                         fseek(archive_fp, 0, SEEK_END);
@@ -1313,13 +1344,13 @@ int main(int argc, char *argv[])
                                 fseek(archive_fp, 0, SEEK_SET);
                                 if (checkArchiveHMAC(archive_fp) != 1) {
                                         printf("Archive has been tampered with. Aborting process\n");
-                                        goto func_end;
+                                        goto func_extract_end;
                                 }
 
                                 fseek(archive_fp, ARCHIVE_HMAC_BLOCKSIZE, SEEK_SET);
                                 if(checkFileHMAC(archive_fp, hash_pass) != 1) {
                                        printf("An archived file has been tampered with. Aborting process\n");   
-                                       goto func_end;
+                                       goto func_extract_end;
                                 }
 
                                 fseek(archive_fp, ARCHIVE_HMAC_BLOCKSIZE, SEEK_SET);
@@ -1337,7 +1368,7 @@ int main(int argc, char *argv[])
  
                                 } else {
                                         printf("Wrong password\n");
-                                        goto func_end;                               
+                                        goto func_extract_end;                               
                                 }        
                                 passCount++;
 
@@ -1345,7 +1376,7 @@ int main(int argc, char *argv[])
                                 //updateArchiveHMAC(archive_fp);
 	                } else {
                                 printf("Specified archive file does not exist\n");
-                                goto func_end;
+                                goto func_extract_end;
 	                }
 
                 } else if ((strcmp(func_name, "delete")) == 0) {
@@ -1356,6 +1387,11 @@ int main(int argc, char *argv[])
                                         if (archive_fp == NULL) {
                                                 printf("open failed\n");
                                                 goto func_end;
+                                        }
+                                        
+                                        newList_fp = fopen(listName, "rb+");
+                                        if(newList_fp == NULL) {
+                                                die("fopen failed in main add1");
                                         }
 
                                         fseek(archive_fp, 0, SEEK_END);
@@ -1416,7 +1452,8 @@ int main(int argc, char *argv[])
                 
 
 func_end: 
-        fclose(archive_fp);
         fclose(newList_fp);
+func_extract_end:        
+        fclose(archive_fp);
 	return 0;
 }
