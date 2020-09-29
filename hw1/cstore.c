@@ -424,6 +424,8 @@ void addArchiveHMAC_Space(FILE *archiveFile)
         if ((n = fwrite(emptyBuf, 1, 32, archiveFile)) != 32) {
                 die("write failed\n");
         }
+
+        free(HMAC_iv);
 }
 
 void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
@@ -708,6 +710,7 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[])
                 free(iv_buf);
                 free(HMAC_IV);
                 free(HMAC_Code);
+                free(key);
 
                 if (ferror(archiveFile)) {
                         die("fread failed\n");
@@ -897,12 +900,12 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         printf("decrypted name: %s\n", fileName);
 
         int newFileNameLength = strlen(newFileName);
-        char nameExt[] = "-decrypted";
+        char nameExt[] = "Decrypted-";
         int newFileExtLength = strlen(nameExt);
 
         char decFileName[newFileNameLength + newFileExtLength + 1];
-        strncpy(decFileName, newFileName, newFileNameLength + 1);
-        strncat(decFileName, nameExt, newFileExtLength);
+        strncpy(decFileName, nameExt, newFileNameLength + 1);
+        strncat(decFileName, newFileName, newFileExtLength);
 
         FILE *newFile_fp = fopen(decFileName, "wb+");
         if(newFile_fp == NULL) {
@@ -944,6 +947,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
         free(iv_buf);
         free(HMAC_IV);
         free(HMAC_Code);
+        fclose(newFile_fp);
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
@@ -1452,7 +1456,8 @@ int main(int argc, char *argv[])
                 
 
 func_end: 
-        fclose(newList_fp);
+        if ((strcmp(func_name, "add")) == 0 || (strcmp(func_name, "add")) == 0) 
+                fclose(newList_fp);
 func_extract_end:        
         fclose(archive_fp);
 	return 0;
