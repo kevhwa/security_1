@@ -54,3 +54,21 @@ Delete behavior
   still be extracted
 - Delete will only mark the first instance of a non-deleted file in the
   archive as having been deleted
+
+
+List behavior
+- When a new archive is created, a new list file is created which stores the
+  file name in plaintext. This implementation was better suited for my
+  current working code. 
+  - Following question 29 on piazza, the professor said that the list
+    function has no integrity check. So if you corrupted the archive and you
+    did the list function, there would be no way integrity check so no way
+    of knowing if the archive has been tampered with and fed in wrong file
+    names. However, when you call add/extract/delete that have integrity
+    checks, these will catch changes.
+  - My implementation is similar in that the list file has no integrity
+    check and can be tampered with. However, the archive itself has
+    integrity checks and so if the archive files were tampered with, it
+    would know. What damage is done to the list file is limited to the list
+    file. The important data, including the names of the files in the
+    archive, are encrypted and integrity protected.
