@@ -1170,7 +1170,7 @@ int main(int argc, char *argv[])
         int newArchive;
         int passCount = 0;
 
-        if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode) || access(archive_name, F_OK) != 0) {
+        if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode)) {
                 die("Not a file");
         }
 
@@ -1362,8 +1362,8 @@ int main(int argc, char *argv[])
                                 fseek(archive_fp, 0, SEEK_SET);
                                 //updateArchiveHMAC(archive_fp);
 	                } else {
-                                printf("Specified archive file does not exist\n");
-                                goto func_extract_end;
+                                die("Specified archive file does not exist");
+                                
 	                }
 
                 } else if ((strcmp(func_name, "delete")) == 0) {
@@ -1429,6 +1429,7 @@ int main(int argc, char *argv[])
                                         printf("Wrong password\n");
                                         goto func_end;                               
                                 }        
+
                        }
                 } else {
                         
