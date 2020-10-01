@@ -445,9 +445,9 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
                        
                         memcpy(byte_buff, buf, n);
 
-                        char fill_amount = sizeof(byte_buff)- n;
+                        char fill_amount = 'a';
 
-                        for (int i = (n -1) ; i < sizeof(byte_buff) ; i++ ) {
+                        for (int i = n; i < sizeof(byte_buff) ; i++ ) {
                                 byte_buff[i] = fill_amount;
                         }
 
@@ -905,8 +905,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
                 //key = temp;
                
                 aes_decryptCBC(buf, 16, dec_buf, key_schedule, 256, iv_buf);
-
-                
+              
                 if (lengthCounter <= 16) {
                         if ((fwrite(dec_buf, 1, lengthCounter, newFile_fp)) != lengthCounter) {
                                 die("write failed in leftover write\n");
@@ -1171,7 +1170,7 @@ int main(int argc, char *argv[])
         int newArchive;
         int passCount = 0;
 
-        if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode)) {
+        if (stat(archive_name, &archive_st) == 0 && S_ISDIR(archive_st.st_mode) || access(archive_name, F_OK) != 0) {
                 die("Not a file");
         }
 
@@ -1254,7 +1253,7 @@ int main(int argc, char *argv[])
                                 }
                                 
                                 fseek(newFile_fp, 0, SEEK_END);
-                                addFileSize = ftell(newFile_fp) - 1;
+                                addFileSize = ftell(newFile_fp);
                                 fseek(newFile_fp, 0, SEEK_SET);
 
                                 long roundup = 0;
@@ -1299,7 +1298,7 @@ int main(int argc, char *argv[])
                                         }
                                 }
                                 fseek(archive_fp, 0, SEEK_END);
-                                long archiveSize = ftell(archive_fp);
+                                long archiveSize = ftell(archive_fp); 
                                 fseek(archive_fp, 0, SEEK_SET);
                                 
                                 //printf("***Updated archive size %ld***\n", archiveSize);
