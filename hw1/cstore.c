@@ -104,7 +104,9 @@ BYTE *genHMAC(BYTE *key, BYTE *text, long size)
         memcpy(temp2, key, 32);
         
         xor_buf_func(ipad, temp, 32); // temp now holds the XOR
-        BYTE textAppend[SHA256_BLOCK_SIZE + (size*8)];
+        BYTE *textAppend = malloc(32 + size);
+        if (textAppend == NULL)
+                die("malloc failed");
 
         memset(textAppend, 0, 32 + size);
         memcpy(textAppend, temp, 32);
@@ -116,7 +118,7 @@ BYTE *genHMAC(BYTE *key, BYTE *text, long size)
         
         xor_buf_func(opad, temp2, 32); // temp now holds the XOR
 
-        BYTE textAppend2[SHA256_BLOCK_SIZE + 32];
+        BYTE textAppend2[SHA256_BLOCK_SIZE + (32*8)];
         memset(textAppend2, 0, 32 + 32);
         memcpy(textAppend2, temp2, 32);
         memcpy(textAppend2 + 32, keyBuf, 32);
@@ -124,7 +126,8 @@ BYTE *genHMAC(BYTE *key, BYTE *text, long size)
         sha256_init(&ctx2);
         sha256_update(&ctx2, textAppend2, 64);
         sha256_final(&ctx2, keyBuf2);
-        
+
+        free(textAppend);
         return keyBuf2;
 
 }
@@ -530,15 +533,19 @@ void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[], long size)
 {
         size_t n;
         BYTE *buf = malloc(size);
+        if (buf == NULL)
+                die("malloc failed");
 
-        long index = ftell(archiveFile);
+        printf("in update fileHMAC\n");
+
+        //long index = ftell(archiveFile);
         //printf("archive position should be 32: %ld\n",index); 
 
         if ((n = fread(buf, 1, size, archiveFile)) != size) {
                 die("read failed, updatefilehmac");
         }
  
-        index = ftell(archiveFile);
+        //index = ftell(archiveFile);
         //printf("archive position should be near end: %ld\n",index);        
 
         BYTE *HMAC_code = genHMAC(hash_pass, buf, size);
@@ -547,7 +554,7 @@ void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[], long size)
         if ((n = fwrite(HMAC_code, 1, 32, archiveFile)) != 32) {
                 die("write failed");
         } 
-        index = ftell(archiveFile);
+        //index = ftell(archiveFile);
         //printf("archive position should be 64: %ld\n",index); 
 
         free(buf);
@@ -729,9 +736,13 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[])
 
 int checkArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
 {
-        //printf("\nInside check archive hmac file\n");
+        printf("\nInside check archive hmac file\n");
         size_t n;
-        BYTE textBuf[size*8];
+        BYTE *textBuf = malloc(size);
+        if (textBuf == NULL)
+                die("malloc failed");
+
+        memset(textBuf, 0, size);
 
         BYTE *HMAC_code = extractHMAC_Code(archiveFile);
        
@@ -746,6 +757,7 @@ int checkArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
         if (memcmp(HMAC_code, HMAC_code_calc, 32) != 0) {     
                 free(HMAC_code_calc);
                 free(HMAC_code);
+                free(textBuf);
                 return -1;
         }
 
@@ -756,6 +768,7 @@ int checkArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
 
         free(HMAC_code_calc);
         free(HMAC_code);
+        free(textBuf);
 
         //fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
         printf("\n*****Successfully validated archive HMAC *****\n");
@@ -768,7 +781,7 @@ int checkArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
 void updateArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
 {
         size_t n;
-        BYTE textBuf[size*8];
+        BYTE *textBuf = malloc(size);
 
         BYTE *HMAC_code = extractHMAC_Code(archiveFile);
        
@@ -790,6 +803,7 @@ void updateArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
 
         free(HMAC_code);
         free(HMAC_code_calc);
+        free(textBuf);
         //free(HMAC_IV);
 
         printf("*****Successfully updated archive HMAC *****\n");
@@ -1227,8 +1241,11 @@ int main(int argc, char *argv[])
                                         fseek(archive_fp, 0, SEEK_END);
                                         addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, addFileSize);                                       
                                 } else {
+                                        printf("here 1\n");
                                         fseek(archive_fp, 0, SEEK_END);
+                                        printf("here 2\n");
                                         long archiveSize = ftell(archive_fp) - ARCHIVE_HMAC_BLOCKSIZE; 
+                                        printf("here 3\n");
                                         fseek(archive_fp, 0, SEEK_SET);
                          
                                         if (checkArchiveHMAC(archive_fp, hash_pass, archiveSize) != 1) {
