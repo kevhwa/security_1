@@ -2,36 +2,49 @@ uni:jch2169
 hw: 1
 
 
-Uses
+Use behavior
 - Archive files must be created using cstore program. If you supply an empty
   file to serve as the archive, program will treat it is a valid archive
-  file just in case it may have been maliciously deleted or tampered with.
+  file. This means it will do a password check, which will fail since the
+  archive is empty. This is just in case it may have been maliciously deleted or tampered with.
+- Files that are to be added must be in current directory. File paths
+  (relative or absolute) are not accepted. Only filenames in current
+  directory will be accepted
+- All decrypted files are created to current directory
 
 
 Restrictions
 - In order to best control edge cases and possible security flaws, multiple
   restrictions have been built in for user input
+  - File size and archive size has been limited to INT_MAX
+  - File and archive names have been restricted in size and to ASCII
+    characters
+  - Passwords have been restricted in size (32 bytes) and to ASCII
+    characters
+
+How to use
+- To run executable: 
+  ./cstore [arguments]
+- To run test script:
+  bash ./testscript.sh
 
 Security
 - For encryption, I utilize my implementation of AES CBC
 - For integrity protection, I utilize my implementation of HMAC. I followed
   the protocol shown in ietf RFC2104. 
 
-- This program offers triple security
+- This program offers an HMAC of each file and an HMAC for the entire
+  archive
   - After every add, extract and delete function, we update the HMAC of that
-    file stored in archive along with the entire archive
+    file stored in archive along with updating the HMAC of the entire archive
   - Before every extract and delete, we verify that the archive HMAC is
     valid and that every individual file's HMAC is valid
-  - Also stored in every file's metadata is a phrase. This decrypted phrase
-    is always checked as another layer of security. Although the phrase is
-    constant, the encryption would make it random even if the same phrase is
-    encrypted over and over again
 
 
 Add behavior
 - Simply continues to append files to the end of the archive, granted the
   password is correct
-- Archive file is able to have multiple instances of the same file
+- Archive files are able to have multiple instances of the same file
 
 
 Extract behavior
@@ -40,7 +53,7 @@ Extract behavior
   zip file. 
   - Thus, if the same file is added into the archive, only the first
     instance of that file will be extracted
-- Extracts to a <filename>-decrypted filename. Will overwrite if a file
+- Extracts to a <Decrypted-><filename> filename. Will overwrite if a file
   with this name exists. The decrypted is added in case a file with the same
   file name but different content happens to be in the same directory.
 
@@ -72,3 +85,5 @@ List behavior
     would know. What damage is done to the list file is limited to the list
     file. The important data, including the names of the files in the
     archive, are encrypted and integrity protected.
+
+
