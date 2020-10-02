@@ -868,7 +868,7 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 
         aes_decryptCBC(decryption_buf, roundup, decrypted_buf, key_schedule, 256, iv_buf);
 
-        if ((n = fwrite(decrypted_buf, 1, roundup, newFile_fp)) != roundup) {
+        if ((n = fwrite(decrypted_buf, 1, lengthCounter, newFile_fp)) != lengthCounter) {
                 die("write failed\n");
         } 
         /* 
