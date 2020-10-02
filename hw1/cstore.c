@@ -183,7 +183,7 @@ int aes_decryptCBC(const BYTE in[], size_t in_len, BYTE out[], const WORD key[],
 {
 	BYTE buf_in[AES_BLOCK_SIZE], buf_out[AES_BLOCK_SIZE], iv_buf[AES_BLOCK_SIZE];
 	int blocks, idx;
-
+        
 	blocks = in_len / AES_BLOCK_SIZE;
 
 	memcpy(iv_buf, iv, AES_BLOCK_SIZE);
@@ -349,8 +349,6 @@ void addList(FILE *list, char *fileName) //, int fileNameLength)
 
 void listList(FILE *list) //, int fileNameLength)
 {
-        //printf("\nInside listList\n");
-        
         size_t n;
         char buf[sizeof(struct listEntry)];
 
@@ -361,8 +359,6 @@ void listList(FILE *list) //, int fileNameLength)
                 }
         } 
 
-        //printf("Exiting listList\n");
-                
 }
 
 
@@ -566,21 +562,16 @@ void updateFileHMAC(FILE *archiveFile, BYTE hash_pass[], long size)
         free(buf);
         free(HMAC_code);
 
-        printf("*****Successfully updated all file HMAC *****\n");
+        printf("*Successfully updated all file HMAC*\n");
         //printf("exiting update file HMAC \n");
 
 }
 
 void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int fileNameLength, char *fileName, long fileLength)
 {
-        //printf("\nIn addFile\n");
-        long index = ftell(archiveFile);
-        //printf("index should be 32: %ld\n", index);
-
 
         BYTE buf[MAX_ENCRYPT_BLOCK_BITS];
         BYTE enc_buf[MAX_ENCRYPT_BLOCK_BITS];
-        //BYTE iv_buf[MAX_ENCRYPT_BLOCK_BITS];
         WORD key_schedule[60];
         size_t n;
         char byte_buff[16];
@@ -592,7 +583,6 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         
         aes_key_setup(hash_pass, key_schedule, 256);
         BYTE *iv_buf = genIV_16();
-        //BYTE *HMAC_iv = genIV_32();
       
         addHMAC_CodeSpace(archiveFile); //32
         addAES_IV(archiveFile, iv_buf); //16
@@ -602,7 +592,31 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
         encryptFileName(archiveFile, fileName, key_schedule, iv_buf); //128
         encryptFileLength(archiveFile, fileLength, key_schedule, iv_buf); //16
 
+        long roundup = 0;
+        while (roundup < fileLength) {
+                roundup += 16;
+        }
+
+        BYTE *encryption_buf = malloc(roundup);
+        BYTE *encrypted_buf = malloc(roundup);
         // Read in 16 bytes intervals
+        if ((n = fread(encryption_buf, 1, fileLength, newFile)) != n) {
+                die("fread failed");
+        }
+
+        char temp[roundup-n];
+        for (int i = 0; i < roundup - n; i++) {
+                temp[i] = 'a';
+        }
+
+        memcpy(encryption_buf + n, temp, roundup-n);
+        
+        aes_encryptCBC(encryption_buf, roundup, encrypted_buf, key_schedule, 256, iv_buf);
+
+        if ((n = fwrite(encrypted_buf, 1, roundup, archiveFile)) != roundup) {
+                die("write failed\n");
+        } 
+        /*
         while ((n = fread(buf, 1, MAX_ENCRYPT_BLOCK_BYTES, newFile)) > 0) {
                 
                 // If less than 16 bytes, pad it with a value that its missing (in char)
@@ -626,33 +640,22 @@ void addFile(FILE *newFile, FILE *archiveFile, FILE *list, BYTE hash_pass[], int
                 }
 
                 round++;
-        }
+        }*/
 
         printf("*****Successfully encrypted and added %s*****\n",fileName );
 
         if (ferror(archiveFile)) {
                 die("fread failed\n");
         } 
-  
-        long roundup = 0;
-        while (roundup < fileLength) {
-                roundup += 16;
-        }
-/*
-        int offset = (round * 16) + (16 * 5) + 128 + 32;
-
-        fseek(archiveFile, -offset, SEEK_CUR); //get you to HMAC code space
-        if (fwrite(key, 1, 32, archiveFile) != 32)
-                die("write failed");
-*/
+        
         fseek(list, 0, SEEK_SET);
         addList(list, fileName);
 
         fseek(archiveFile, -(roundup + METADATA_BLOCKSIZE + 16), SEEK_CUR);
         updateFileHMAC(archiveFile, hash_pass, (roundup + METADATA_BLOCKSIZE + 16));
-        //free(key);
         free(iv_buf);
-        //free(HMAC_iv);
+        free(encrypted_buf);
+        free(encryption_buf);
         fclose(newFile);
 }
 
@@ -729,7 +732,7 @@ int checkFileHMAC(FILE *archiveFile, BYTE hash_pass[])
         }
 
         //fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
-        printf("\n*****Successfully validated all file HMACs *****\n");
+        printf("*Successfully validated all file HMACs*\n");
         //printf("exiting HMAC check file\n");
 
         return 1;
@@ -772,7 +775,7 @@ int checkArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
         free(textBuf);
 
         //fseek(archiveFile, -(offset + METADATA_BLOCKSIZE), SEEK_CUR);
-        printf("\n*****Successfully validated archive HMAC *****\n");
+        printf("\n*Successfully validated archive HMAC*\n");
         //printf("exiting update HMAC \n");
 
         return 1;
@@ -809,7 +812,7 @@ void updateArchiveHMAC(FILE *archiveFile, BYTE *hash_pass, long size)
         free(HMAC_code_calc);
         free(textBuf);
 
-        printf("*****Successfully updated archive HMAC *****\n");
+        printf("*Successfully updated archive HMAC*\n");
         //printf("exiting update HMAC \n");
 }
 
@@ -856,6 +859,19 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
                 roundup += 16;
         }
 
+        BYTE *decryption_buf = malloc(roundup);
+        BYTE *decrypted_buf = malloc(roundup);
+        // Read in 16 bytes intervals
+        if ((n = fread(decryption_buf, 1, roundup, archiveFile)) != n) {
+                die("fread failed");
+        }
+
+        aes_decryptCBC(decryption_buf, roundup, decrypted_buf, key_schedule, 256, iv_buf);
+
+        if ((n = fwrite(decrypted_buf, 1, roundup, newFile_fp)) != roundup) {
+                die("write failed\n");
+        } 
+        /* 
         // Read in 16 bytes
         while (lengthCounter >= 0 && (n = fread(buf, 1, sizeof(buf) / 8, archiveFile)) > 0) {
  
@@ -872,15 +888,15 @@ void extractFile(FILE *archiveFile, BYTE hash_pass[], char *newFileName)
 
                 }
                 lengthCounter -= n;
-        }
+        }*/
         
         free(fileDeleteMarker_ptr);
         free(fileNameLength);
         free(fileName);
         free(fileLength);
         free(iv_buf);
-        //free(HMAC_IV);
-        //free(HMAC_Code);
+        free(decryption_buf);
+        free(decrypted_buf);
         fclose(newFile_fp);
 
         if (ferror(archiveFile)) {
@@ -1070,7 +1086,7 @@ int main(int argc, char *argv[])
                                         fclose(listFile_fp);
                                         die("open failed\n");
                                 }
-                                printf("*****Current files in %s*****\n", theArchiveName); 
+                                printf("\n*****Current files in %s*****\n", theArchiveName); 
         		        listList(listFile_fp);
                                 fclose(listFile_fp);
 		        } else {
@@ -1236,13 +1252,13 @@ int main(int argc, char *argv[])
 
                                         fseek(archive_fp, 0, SEEK_SET);
                                         if (checkArchiveHMAC(archive_fp, hash_pass, archive_size) != 1) {
-                                                printf("Archive has been tampered with or wrong password. Aborting process\n");
+                                                printf("\nArchive has been tampered with or wrong password. Aborting process\n");
                                                 goto func_end;
                                         }
                                        
                                         fseek(archive_fp, ARCHIVE_HMAC_BLOCKSIZE, SEEK_SET);
                                         if (checkFileHMAC(archive_fp, hash_pass) != 1) {
-                                                printf("A file has been tampered with. Aborting process\n");
+                                                printf("\nA file has been tampered with. Aborting process\n");
                                                 goto func_end;
                                         }
 
@@ -1251,7 +1267,7 @@ int main(int argc, char *argv[])
                                                 fseek(archive_fp, 0, SEEK_END);
                                                 addFile(newFile_fp, archive_fp, newList_fp, hash_pass, nameLength, fileName, newFile_size); 
                                         } else {
-                                                printf("Wrong password\n");
+                                                printf("\nWrong password\n");
                                                 fclose(newFile_fp);
                                                 goto func_end;
                                 
@@ -1289,13 +1305,13 @@ int main(int argc, char *argv[])
 
                                 fseek(archive_fp, 0, SEEK_SET);
                                 if (checkArchiveHMAC(archive_fp, hash_pass, archive_size) != 1) {
-                                        printf("Archive has been tampered with or wrong password. Aborting process\n");
+                                        printf("\nArchive has been tampered with or wrong password. Aborting process\n");
                                         goto func_extract_end;
                                 }
 
                                 fseek(archive_fp, ARCHIVE_HMAC_BLOCKSIZE, SEEK_SET);
                                 if(checkFileHMAC(archive_fp, hash_pass) != 1) {
-                                       printf("An archived file has been tampered with. Aborting process\n");   
+                                       printf("\nAn archived file has been tampered with. Aborting process\n");   
                                        goto func_extract_end;
                                 }
 
@@ -1313,7 +1329,7 @@ int main(int argc, char *argv[])
                                         extractFile(archive_fp, hash_pass, newFile_name); 
  
                                 } else {
-                                        printf("Wrong password\n");
+                                        printf("\nWrong password\n");
                                         goto func_extract_end;                               
                                 }        
                                 passCount++;
@@ -1346,13 +1362,13 @@ int main(int argc, char *argv[])
                                 // can cancel once you implment hmac for archive
                                 fseek(archive_fp, 0, SEEK_SET);
                                 if (checkArchiveHMAC(archive_fp, hash_pass, archive_size) != 1) {
-                                        printf("Archive has been tampered with or wrong password. Aborting process\n");
+                                        printf("\nArchive has been tampered with or wrong password. Aborting process\n");
                                         goto func_end;
                                 }                               
  
                                 fseek(archive_fp, ARCHIVE_HMAC_BLOCKSIZE, SEEK_SET);
                                 if(checkFileHMAC(archive_fp, hash_pass) != 1) {
-                                       printf("A file has been tampered with. Aborting process\n");   
+                                       printf("\nA file has been tampered with. Aborting process\n");   
                                        goto func_end;
                                 }
 
@@ -1381,7 +1397,7 @@ int main(int argc, char *argv[])
                                         updateArchiveHMAC(archive_fp, hash_pass, archive_size);
                                        
                                 } else {
-                                        printf("Wrong password\n");
+                                        printf("\nWrong password\n");
                                         goto func_end;                               
                                 }        
 
@@ -1390,6 +1406,9 @@ int main(int argc, char *argv[])
                         
                         die("Please choose an appropriate function: list, add, extract, delete");
                 }
+        } 
+        if (passCount == 0) { 
+                return 0;
         }
                 
 

@@ -68,6 +68,6 @@ printf "\n*******TEST SCRIPT******** deleting random file that doesnt exist"
 
 printf "\n*******TEST SCRIPT******** can vim decrypted cstore.c and verity all is good, along with running command cmp <file> <decryptedfile>"
 
-printf "\n*******TEST SCRIPT******** test script done"
+printf "\n*******TEST SCRIPT******** test script done\n"
 
 exit 0

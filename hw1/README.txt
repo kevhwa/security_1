@@ -29,7 +29,12 @@ How to use
   bash ./testscript.sh
 
 Security
-- For encryption, I utilize my implementation of AES CBC
+- For encryption, I utilize my implementation of AES CBC. I chose this
+  method of encryption to increase security. As mentioned in class, AES is a
+  block cypher and if multiple blocks are repeated (as does in image files),
+  then the outputs will also be the same. In CBC, each subsequent block
+  cypher is dependent on the previous encryption block, further obscuring
+  the output.
 - For integrity protection, I utilize my implementation of HMAC. I followed
   the protocol shown in ietf RFC2104. 
 
