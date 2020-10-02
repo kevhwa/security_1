@@ -1286,7 +1286,7 @@ int main(int argc, char *argv[])
                                 
 	                } else {
                                
-                               printf("%s does not exist\n", newFile_name); 
+                               printf("\n%s does not exist\n", newFile_name); 
                                continue;
 	                }
                 } else if ((strcmp(func_name, "extract")) == 0) {
