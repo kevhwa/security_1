@@ -30,7 +30,7 @@ chmod 444 $HOMEROOT/certs/ca.cert.pem
 mkdir $HOME/ca/intermediate
 HOMEINTER=$HOMEROOT/intermediate
 
-mkdir $HOMEINTER/certs $HOMEINTER/crl $HOMEINTER/newcerts $HOMEINTER/private
+mkdir $HOMEINTER/certs $HOMEINTER/crl $HOMEINTER/csr $HOMEINTER/newcerts $HOMEINTER/private
 chmod 700 $HOMEINTER/private
 touch $HOMEINTER/index.txt
 echo 1000 > $HOMEINTER/serial
