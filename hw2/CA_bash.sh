@@ -14,7 +14,7 @@ chmod 700 $HOMEROOT/private
 touch $HOMEROOT/index.txt
 echo 1000 > $HOMEROOT/serial
 
-openssl genrsa -aes256 -out $HOMEROOT/private/ca.key.pem 4096
+openssl genrsa -aes256 -passout pass:pass -out $HOMEROOT/private/ca.key.pem 4096
 
 chmod 400 $HOMEROOT/private/ca.key.pem
 cp $HOME/root_openssl.cnf $HOMEROOT/root_openssl.cnf
@@ -37,7 +37,7 @@ echo 1000 > $HOMEINTER/serial
 
 cp $HOME/inter_openssl.cnf $HOMEINTER/inter_openssl.cnf
 
-openssl genrsa -aes256 -out $HOMEINTER/private/intermediate.key.pem
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate.key.pem
 
 chmod 400 $HOMEINTER/private/intermediate.key.pem
 
@@ -49,3 +49,85 @@ openssl ca -config $HOMEROOT/root_openssl.cnf -extensions v3_intermediate_ca -da
 
 chmod 444 $HOMEINTER/certs/intermediate.cert.pem
 
+# Verify intermediate certificate
+echo ""
+echo "Verifying inter ca"
+openssl verify -CAfile $HOMEROOT/certs/ca.cert.pem $HOMEINTER/certs/intermediate.cert.pem
+
+# Create certificate chain file
+cat $HOMEINTER/certs/intermediate.cert.pem $HOMEROOT/certs/ca.cert.pem > $HOMEINTER/certs/ca-chain.cert.pem
+
+chmod 444 $HOMEINTER/certs/ca-chain.cert.pem
+
+echo " "
+echo "Creating server cert"
+
+#
+# Creating a server certificate
+#
+
+# Create a key pair for the webserver
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_server.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_server.com.key.pem
+
+# Create a CSR for the webserver
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -key $HOMEINTER/private/www.example_server.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_server.com.csr.pem
+
+# Intermediate CA signs web server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf -extensions server_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_server.com.csr.pem -out $HOMEINTER/certs/www.example_server.com.cert.pem
+
+chmod 444 $HOMEINTER/certs/www.example_server.com.cert.pem
+
+echo " "
+echo "Creating client cert"
+#
+# Creating a client certificate
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client.com.key.pem
+
+# Create a CSR for the webserver
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -key $HOMEINTER/private/www.example_client.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client.com.csr.pem -out $HOMEINTER/certs/www.example_client.com.cert.pem
+
+chmod 444 $HOMEINTER/certs/www.example_client.com.cert.pem
+
+echo " "
+echo "Verifying chain of trust server certificate"
+openssl verify -CAfile $HOMEINTER/certs/ca-chain.cert.pem $HOMEINTER/certs/www.example_server.com.cert.pem
+
+echo " "
+echo "Verifying chain of trust client certificate"
+openssl verify -CAfile $HOMEINTER/certs/ca-chain.cert.pem $HOMEINTER/certs/www.example_client.com.cert.pem
+
+#
+# Creating a client certificate (EXPIRED)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client2.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client2.com.key.pem
+
+# Create a CSR for the webserver
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -key $HOMEINTER/private/www.example_client2.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client2.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf -startdate 201010231800Z -enddate 201010231800Z -extensions usr_cert -notext -md sha256 -in $HOMEINTER/csr/www.example_client2.com.csr.pem -out $HOMEINTER/certs/www.example_client2.com.cert.pem
+
+chmod 444 $HOMEINTER/certs/www.example_client2.com.cert.pem
