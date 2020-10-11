@@ -49,6 +49,7 @@ touch $HOMEINTER/index.txt
 echo 1000 > $HOMEINTER/serial
 
 cp $HOME/inter_openssl.cnf $HOMEINTER/inter_openssl.cnf
+cp $HOME/inter_openssl2.cnf $HOMEINTER/inter_openssl2.cnf
 
 openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate.key.pem
 
@@ -71,6 +72,34 @@ openssl verify -CAfile $HOMEROOT/certs/ca.cert.pem $HOMEINTER/certs/intermediate
 cat $HOMEINTER/certs/intermediate.cert.pem $HOMEROOT/certs/ca.cert.pem > $HOMEINTER/certs/ca-chain.cert.pem
 
 chmod 444 $HOMEINTER/certs/ca-chain.cert.pem
+
+#
+## Creating Intermediary > Intermediary CA
+# 
+
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate2.key.pem
+
+chmod 400 $HOMEINTER/private/intermediate2.key.pem
+
+#Create intermediary certficate request to become intermediate CA
+openssl req -config $HOMEINTER/inter_openssl2.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=interCA2' -new -sha256 -passin pass:pass -key $HOMEINTER/private/intermediate2.key.pem -out $HOMEINTER/csr/intermediate2.csr.pem
+
+#CA root now signs intermediate certificate request to create intermediate CA
+openssl ca -config $HOMEINTER/inter_openssl.cnf -passin pass:pass -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -in $HOMEINTER/csr/intermediate2.csr.pem -out $HOMEINTER/certs/intermediate2.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/intermediate2.cert.pem
+
+openssl x509 -noout -text -in $HOMEINTER/certs/intermediate2.cert.pem
+# Verify intermediate certificate
+echo ""
+echo "Verifying inter ca2"
+openssl verify -CAfile $HOMEINTER/certs/ca-chain.cert.pem $HOMEINTER/certs/intermediate2.cert.pem
+
+# Create certificate chain file
+cat $HOMEINTER/certs/intermediate2.cert.pem $HOMEINTER/certs/ca-chain.cert.pem > $HOMEINTER/certs/ca-chain2.cert.pem
+
+chmod 444 $HOMEINTER/certs/ca-chain2.cert.pem
+
 
 echo " "
 echo "Creating server cert"
@@ -202,3 +231,29 @@ openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=US/ST=New York/O=COMS
 openssl x509 -req -in $HOMEINTER/csr/www.example_client6.com.csr.pem -extfile $HOMEROOT/root_openssl.cnf -extensions v3_ca -signkey $HOMEINTER/private/www.example_client6.com.key.pem -out $HOMEINTER/certs/www.example_client6.com.cert.pem -passin pass:pass
 
 chmod 444 $HOMEINTER/certs/www.example_client6.com.cert.pem
+
+#
+# Creating a client certificate (Chain intermediate CA)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client8.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client8.com.key.pem
+
+# Create a CSR for the client
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl2.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclient8.com' -passin pass:pass -key $HOMEINTER/private/www.example_client8.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client8.com.csr.pem
+
+# Intermediate CA signs client CSR
+
+openssl ca -config $HOMEINTER/inter_openssl2.cnf -passin pass:pass -days 100 -extensions usr_cert -md sha256 -in $HOMEINTER/csr/www.example_client8.com.csr.pem -out $HOMEINTER/certs/www.example_client8.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client8.com.cert.pem
+
+echo "Verifying chain of trust client certificate"
+openssl verify -CAfile $HOMEINTER/certs/ca-chain2.cert.pem $HOMEINTER/certs/www.example_client8.com.cert.pem
+
+openssl x509 -noout -text -in $HOMEINTER/certs/www.example_client8.com.cert.pem
+
