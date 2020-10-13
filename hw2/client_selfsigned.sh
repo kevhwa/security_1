@@ -11,5 +11,5 @@ echo " "
 echo "Testing self-signed certificate"
 echo " "
 
-openssl s_client -connect localhost:$PORT -cert $HOMEINTER/certs/www.example_client_selfsigned.com.cert.pem -key $HOMEINTER/private/www.example_client_selfsigned.com.key.pem -pass pass:pass -verify $DEPTH -verify_return_error -CApath $HOMEROOT/certs -CAfile $HOMEROOT/certs/ca.cert.pem -prexit -quiet
+openssl s_client -connect localhost:$PORT -cert $HOMEINTER/certs/www.example_client_selfsigned.com.cert.pem -key $HOMEINTER/private/www.example_client_selfsigned.com.key.pem -pass pass:pass -verify $DEPTH -verify_return_error -CApath $HOMEROOT/certs -CAfile $HOMEROOT/certs/ca.cert.pem -prexit -quiet >> $HOME/clientlog.txt 2>&1
 

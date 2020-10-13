@@ -23,6 +23,8 @@ cp $HOME/root_openssl.cnf $HOMEROOT/root_openssl.cnf
 cp $HOME/root_openssl_unrecognized.cnf $HOMEROOT/root_openssl_unrecognized.cnf
 cp $HOME/root_openssl_comemail.cnf $HOMEROOT/root_openssl_comemail.cnf
 cp $HOME/root_openssl_digsig.cnf $HOMEROOT/root_openssl_digsig.cnf
+cp $HOME/root_openssl_cafalse.cnf $HOMEROOT/root_openssl_cafalse.cnf
+cp $HOME/root_openssl_nocertsign.cnf $HOMEROOT/root_openssl_nocertsign.cnf
 
 openssl req -config $HOMEROOT/root_openssl.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=rootCA' -passin pass:pass -key $HOMEROOT/private/ca.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out $HOMEROOT/certs/ca.cert.pem 
 
@@ -62,6 +64,28 @@ openssl req -config $HOMEROOT/root_openssl_digsig.cnf -subj '/C=US/ST=New York/O
 chmod 444 $HOMEROOT/certs/ca_digsig.cert.pem
 
 #
+### Creating ROOT CA for ca false intermediate CA
+#
+openssl genrsa -aes256 -passout pass:pass -out $HOMEROOT/private/ca_cafalse.key.pem 4096
+
+chmod 400 $HOMEROOT/private/ca_cafalse.key.pem
+
+openssl req -config $HOMEROOT/root_openssl_cafalse.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=rootCA_cafalse' -passin pass:pass -key $HOMEROOT/private/ca_cafalse.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out $HOMEROOT/certs/ca_cafalse.cert.pem 
+
+chmod 444 $HOMEROOT/certs/ca_cafalse.cert.pem
+
+#
+### Creating ROOT CA for nocertsign intermediate CA
+#
+openssl genrsa -aes256 -passout pass:pass -out $HOMEROOT/private/ca_nocertsign.key.pem 4096
+
+chmod 400 $HOMEROOT/private/ca_nocertsign.key.pem
+
+openssl req -config $HOMEROOT/root_openssl_nocertsign.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=rootCA_nocertsign' -passin pass:pass -key $HOMEROOT/private/ca_nocertsign.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out $HOMEROOT/certs/ca_nocertsign.cert.pem 
+
+chmod 444 $HOMEROOT/certs/ca_nocertsign.cert.pem
+
+#
 # Creating Intermediary CA
 #
 
@@ -79,6 +103,9 @@ cp $HOME/inter_openssl_unrecognized.cnf $HOMEINTER/inter_openssl_unrecognized.cn
 cp $HOME/inter_openssl_noauth.cnf $HOMEINTER/inter_openssl_noauth.cnf
 cp $HOME/inter_openssl_comemail.cnf $HOMEINTER/inter_openssl_comemail.cnf
 cp $HOME/inter_openssl_digsig.cnf $HOMEINTER/inter_openssl_digsig.cnf
+cp $HOME/inter_openssl_cafalse.cnf $HOMEINTER/inter_openssl_cafalse.cnf
+cp $HOME/inter_openssl_badident.cnf $HOMEINTER/inter_openssl_badident.cnf
+cp $HOME/inter_openssl_nocertsign.cnf $HOMEINTER/inter_openssl_nocertsign.cnf
 
 openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate.key.pem
 
@@ -191,6 +218,53 @@ chmod 444 $HOMEINTER/certs/intermediate_digsig.cert.pem
 cat $HOMEINTER/certs/intermediate_digsig.cert.pem $HOMEROOT/certs/ca_digsig.cert.pem > $HOMEINTER/certs/ca-chain_digsig.cert.pem
 
 chmod 444 $HOMEINTER/certs/ca-chain_digsig.cert.pem
+
+#
+# Creating Intermediary CA with cafalse
+#
+
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate_cafalse.key.pem
+
+chmod 400 $HOMEINTER/private/intermediate_cafalse.key.pem
+
+#Create intermediary certficate request to become intermediate CA
+openssl req -config $HOMEINTER/inter_openssl_cafalse.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=interCA_cafalse' -new -sha256 -passin pass:pass -key $HOMEINTER/private/intermediate_cafalse.key.pem -out $HOMEINTER/csr/intermediate_cafalse.csr.pem
+
+#CA root now signs intermediate certificate request to create intermediate CA
+openssl ca -config $HOMEROOT/root_openssl_cafalse.cnf -passin pass:pass -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -in $HOMEINTER/csr/intermediate_cafalse.csr.pem -out $HOMEINTER/certs/intermediate_cafalse.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/intermediate_cafalse.cert.pem
+
+# Create certificate chain file
+cat $HOMEINTER/certs/intermediate_cafalse.cert.pem $HOMEROOT/certs/ca_cafalse.cert.pem > $HOMEINTER/certs/ca-chain_cafalse.cert.pem
+
+chmod 444 $HOMEINTER/certs/ca-chain_cafalse.cert.pem
+
+#
+# Creating Intermediary CA with cafalse
+#
+
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate_nocertsign.key.pem
+
+chmod 400 $HOMEINTER/private/intermediate_nocertsign.key.pem
+
+#Create intermediary certficate request to become intermediate CA
+openssl req -config $HOMEINTER/inter_openssl_nocertsign.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=interCA_nocertsign' -new -sha256 -passin pass:pass -key $HOMEINTER/private/intermediate_nocertsign.key.pem -out $HOMEINTER/csr/intermediate_nocertsign.csr.pem
+
+#CA root now signs intermediate certificate request to create intermediate CA
+openssl ca -config $HOMEROOT/root_openssl_nocertsign.cnf -passin pass:pass -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -in $HOMEINTER/csr/intermediate_nocertsign.csr.pem -out $HOMEINTER/certs/intermediate_nocertsign.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/intermediate_nocertsign.cert.pem
+
+# Create certificate chain file
+cat $HOMEINTER/certs/intermediate_nocertsign.cert.pem $HOMEROOT/certs/ca_nocertsign.cert.pem > $HOMEINTER/certs/ca-chain_nocertsign.cert.pem
+
+chmod 444 $HOMEINTER/certs/ca-chain_nocertsign.cert.pem
+
+############################################################################3#####
+##############################################################################3#####
+###########################################################################3#####
+###########################################################################3#####
 
 #
 # Creating a server certificate
@@ -348,6 +422,50 @@ openssl ca -config $HOMEINTER/inter_openssl_digsig.cnf -passin pass:pass -extens
 
 chmod 444 $HOMEINTER/certs/www.example_server_digsig.com.cert.pem
 
+#
+# Creating a server certificate (ca false)
+#
+
+# Create a key pair for the webserver
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_server_cafalse.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_server_cafalse.com.key.pem
+
+# Create a CSR for the webserver
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_cafalse.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleservercafalse.com' -passin pass:pass -key $HOMEINTER/private/www.example_server_cafalse.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_server_cafalse.com.csr.pem
+
+# Intermediate CA signs web server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_cafalse.cnf -passin pass:pass -extensions server_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_server_cafalse.com.csr.pem -out $HOMEINTER/certs/www.example_server_cafalse.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_server_cafalse.com.cert.pem
+
+#
+# Creating a server certificate (nocertsign)
+#
+
+# Create a key pair for the webserver
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_server_nocertsign.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_server_nocertsign.com.key.pem
+
+# Create a CSR for the webserver
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_nocertsign.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleservernocertsign.com' -passin pass:pass -key $HOMEINTER/private/www.example_server_nocertsign.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_server_nocertsign.com.csr.pem
+
+# Intermediate CA signs web server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_nocertsign.cnf -passin pass:pass -extensions server_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_server_nocertsign.com.csr.pem -out $HOMEINTER/certs/www.example_server_nocertsign.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_server_nocertsign.com.cert.pem
+
+############################################################################3#####
+##############################################################################3#####
+###########################################################################3#####
+###########################################################################3#####
 
 #
 # Creating a client certificate
@@ -559,4 +677,123 @@ openssl req -config $HOMEINTER/inter_openssl_digsig.cnf -subj '/C=US/ST=New York
 openssl ca -config $HOMEINTER/inter_openssl_digsig.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_digsig.com.csr.pem -out $HOMEINTER/certs/www.example_client_digsig.com.cert.pem -batch
 
 chmod 444 $HOMEINTER/certs/www.example_client_digsig.com.cert.pem
+#
+# Creating a client certificate (mismatch subject key identifier)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_badident.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_badident.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_badident.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientbadident.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_badident.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_badident.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_badident.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_badident.com.csr.pem -out $HOMEINTER/certs/www.example_client_badident.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_badident.com.cert.pem
+
+#
+# Creating a client certificate (To be created)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_tooearly.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_tooearly.com.key.pem
+
+# Create a CSR for the client
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclienttooearly.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_tooearly.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_tooearly.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf -passin pass:pass -startdate 251010231800Z -enddate 251010231800Z -extensions usr_cert -notext -md sha256 -in $HOMEINTER/csr/www.example_client_tooearly.com.csr.pem -out $HOMEINTER/certs/www.example_client_tooearly.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_tooearly.com.cert.pem
+
+#
+# Creating a client certificate (Wrong to be created time)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_wrongearly.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_wrongearly.com.key.pem
+
+# Create a CSR for the client
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientwrongearly.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_wrongearly.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_wrongearly.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf -passin pass:pass -startdate 20150214120000Z -enddate 251010231800Z -extensions usr_cert -notext -md sha256 -in $HOMEINTER/csr/www.example_client_wrongearly.com.csr.pem -out $HOMEINTER/certs/www.example_client_wrongearly.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_wrongearly.com.cert.pem
+
+#
+# Creating a client certificate (ca false)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_cafalse.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_cafalse.com.key.pem
+
+# Create a CSR for the client
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_cafalse.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientcafalse.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_cafalse.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_cafalse.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_cafalse.cnf -passin pass:pass -startdate 151214120000Z -enddate 251023180000Z -extensions usr_cert -notext -md sha256 -in $HOMEINTER/csr/www.example_client_cafalse.com.csr.pem -out $HOMEINTER/certs/www.example_client_cafalse.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_cafalse.com.cert.pem
+
+#
+# Creating a client certificate (no certsign)
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_nocertsign.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_nocertsign.com.key.pem
+
+# Create a CSR for the client
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_nocertsign.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientnocertsign.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_nocertsign.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_nocertsign.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_nocertsign.cnf -passin pass:pass -startdate 151214120000Z -enddate 251023180000Z -extensions usr_cert -notext -md sha256 -in $HOMEINTER/csr/www.example_client_nocertsign.com.csr.pem -out $HOMEINTER/certs/www.example_client_nocertsign.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_nocertsign.com.cert.pem
+
+#
+# Creating a client certificate
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_mismatch.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_mismatch.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=SK/ST=Seoul/O=COMS4182 Hw0/CN=www.exampleclientmismatch.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_mismatch.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_mismatch.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_mismatch.com.csr.pem -out $HOMEINTER/certs/www.example_client_mismatch.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_mismatch.com.cert.pem
 

@@ -1,16 +1,7 @@
-hello hello
-
-
-
-
-hello
-
-test
-test
-
-
-
-
-test
-test
-
+****************************
+TEXTFILE BEING SERVED
+TEST
+TEST
+TEST
+TEXTFILE FINISHED
+****************************

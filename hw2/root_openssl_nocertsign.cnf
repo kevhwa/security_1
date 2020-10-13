@@ -1,5 +1,5 @@
-# OpenSSL intermediate CA configuration file.
-# Copy to `/root/ca/intermediate/openssl.cnf`.
+# OpenSSL root CA configuration file.
+# Copy to `/root/ca/openssl.cnf`.
 
 [ ca ]
 # `man ca`
@@ -7,7 +7,7 @@ default_ca = CA_default
 
 [ CA_default ]
 # Directory and file locations.
-dir               = /home/mushu/security_1/hw2/ca/intermediate
+dir               = /home/mushu/security_1/hw2/ca
 certs             = $dir/certs
 crl_dir           = $dir/crl
 new_certs_dir     = $dir/newcerts
@@ -16,12 +16,12 @@ serial            = $dir/serial
 RANDFILE          = $dir/private/.rand
 
 # The root key and root certificate.
-private_key       = $dir/private/intermediate.key.pem
-certificate       = $dir/certs/intermediate.cert.pem
+private_key       = $dir/private/ca_nocertsign.key.pem
+certificate       = $dir/certs/ca_nocertsign.cert.pem
 
 # For certificate revocation lists.
 crlnumber         = $dir/crlnumber
-crl               = $dir/crl/intermediate.crl.pem
+crl               = $dir/crl/ca.crl.pem
 crl_extensions    = crl_ext
 default_crl_days  = 30
 
@@ -32,7 +32,7 @@ name_opt          = ca_default
 cert_opt          = ca_default
 default_days      = 375
 preserve          = no
-policy            = policy_loose
+policy            = policy_strict
 
 [ policy_strict ]
 # The root CA should only sign intermediate certificates that match.
@@ -90,14 +90,14 @@ emailAddress_default            =
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
 basicConstraints = critical, CA:true
-keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+keyUsage = critical, digitalSignature, cRLSign
 
 [ v3_intermediate_ca ]
 # Extensions for a typical intermediate CA (`man x509v3_config`).
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
 basicConstraints = critical, CA:true #, pathlen:0
-keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+keyUsage = critical, digitalSignature, cRLSign
 
 [ usr_cert ]
 # Extensions for client certificates (`man x509v3_config`).
@@ -108,7 +108,6 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth, emailProtection
-subjectAltName = @alternate_names
 
 [ server_cert ]
 # Extensions for server certificates (`man x509v3_config`).
@@ -119,14 +118,6 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
-subjectAltName = @alternate_names
-
-[ alternate_names ]
-DNS.1       = www.example.com
-DNS.2       = www.example_client.com
-DNS.3       = www.example_server.com
-DNS.4       = ftp.example.com
-IP          = 192.168.230.6
 
 [ crl_ext ]
 # Extension for CRLs (`man x509v3_config`).

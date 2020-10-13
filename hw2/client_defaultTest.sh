@@ -8,4 +8,11 @@ echo "Testing client tests"
 ./client_expired.sh
 ./client_nocert.sh
 ./client_selfsigned.sh
+./client_tooearly.sh
+./client_badtrust.sh
+./client_wrongemail.sh
+./client_wronghostname.sh
+./client_wrongipaddr.sh
+./client_authLevel.sh
+
 

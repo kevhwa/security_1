@@ -10,3 +10,6 @@
  ./CA_bash.sh
  touch clientlog.txt
  touch serverlog.txt
+
+
+ #ADD CHMOD FOR ALL THE SCRIPTS HERE
