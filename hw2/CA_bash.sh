@@ -85,6 +85,12 @@ openssl req -config $HOMEROOT/root_openssl_nocertsign.cnf -subj '/C=US/ST=New Yo
 
 chmod 444 $HOMEROOT/certs/ca_nocertsign.cert.pem
 
+
+# Create a file with all trusted root certificates
+cat $HOMEROOT/certs/ca_cafalse.cert.pem $HOMEROOT/certs/ca_comemail.cert.pem $HOMEROOT/certs/ca_nocertsign.cert.pem $HOMEROOT/certs/ca.cert.pem $HOMEROOT/ca_digsig.cert.pem $HOMEROOTS/ca_unrecognized.cert.pem > $HOMEROOT/certs/ca_all.cert.pem
+
+chmod 444 $HOMEINTER/certs/ca-chain_nocertsign.cert.pem
+
 #
 # Creating Intermediary CA
 #
