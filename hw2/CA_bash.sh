@@ -106,6 +106,8 @@ cp $HOME/inter_openssl_digsig.cnf $HOMEINTER/inter_openssl_digsig.cnf
 cp $HOME/inter_openssl_cafalse.cnf $HOMEINTER/inter_openssl_cafalse.cnf
 cp $HOME/inter_openssl_badident.cnf $HOMEINTER/inter_openssl_badident.cnf
 cp $HOME/inter_openssl_nocertsign.cnf $HOMEINTER/inter_openssl_nocertsign.cnf
+cp $HOME/inter_openssl_encryption.cnf $HOMEINTER/inter_openssl_encryption.cnf
+cp $HOME/inter_openssl_signing.cnf $HOMEINTER/inter_openssl_signing.cnf
 
 openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/intermediate.key.pem
 
@@ -796,4 +798,44 @@ openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=SK/ST=Seoul/O=COMS418
 openssl ca -config $HOMEINTER/inter_openssl.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_mismatch.com.csr.pem -out $HOMEINTER/certs/www.example_client_mismatch.com.cert.pem -batch
 
 chmod 444 $HOMEINTER/certs/www.example_client_mismatch.com.cert.pem
+
+#
+# Creating a client certificate for encryption only
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_encryption.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_encryption.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_encryption.cnf -subj '/C=SK/ST=Seoul/O=COMS4182 Hw0/CN=www.exampleclientencrytpion.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_encryption.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_encryption.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_encryption.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_encryption.com.csr.pem -out $HOMEINTER/certs/www.example_client_encryption.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_encryption.com.cert.pem
+
+#
+# Creating a client certificate for signing only
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_signing.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_signing.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl_signing.cnf -subj '/C=SK/ST=Seoul/O=COMS4182 Hw0/CN=www.exampleclientsigning.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_signing.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_signing.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl_signing.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_signing.com.csr.pem -out $HOMEINTER/certs/www.example_client_signing.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_signing.com.cert.pem
 
