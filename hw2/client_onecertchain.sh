@@ -8,7 +8,7 @@ PORT=8000
 DEPTH=4
 
 echo "***"
-echo "Testing client sending wrong certchain"
+echo "Testing client sending certchain with one entry "
 echo " "
 
 printf 'GET /file.txt HTTP/1.0\r\n' > $HOME/exampleRequest.txt

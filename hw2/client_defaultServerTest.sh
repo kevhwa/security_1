@@ -17,4 +17,6 @@ echo "Testing client tests"
 ./client_wrongipaddr.sh
 ./client_authLevel.sh
 ./client_noauth.sh
+./client_crlcheck.sh
+./client_encryption.sh
 
