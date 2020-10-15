@@ -6,4 +6,5 @@
 
  rm -rf $HOME/ca
  rm $HOME/clientlog.txt $HOME/serverlog.txt
+ rm $HOME/temp1.txt $HOME/temp2.txt $HOME/temp3.txt
 

@@ -6,10 +6,12 @@
 
  rm -rf $HOME/ca
  rm $HOME/clientlog.txt $HOME/serverlog.txt
+ rm $HOME/temp1.txt $HOME/temp2.txt $HOME/temp3.txt
+
 
  ./CA_bash.sh
- touch clientlog.txt
- touch serverlog.txt
+ touch $HOME/clientlog.txt
+ touch $HOME/serverlog.txt
 
 
  #ADD CHMOD FOR ALL THE SCRIPTS HERE

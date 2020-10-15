@@ -5,6 +5,8 @@ HOME=/home/mushu/security_1/hw2
 echo "Testing client tests"
 
 ./client_default.sh
+./client_default2.sh
+./client_default3.sh
 ./client_expired.sh
 ./client_nocert.sh
 ./client_selfsigned.sh
@@ -14,5 +16,5 @@ echo "Testing client tests"
 ./client_wronghostname.sh
 ./client_wrongipaddr.sh
 ./client_authLevel.sh
-
+./client_noauth.sh
 
