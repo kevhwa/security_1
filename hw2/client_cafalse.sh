@@ -8,7 +8,7 @@ PORT=8000
 DEPTH=4
 
 echo "***"
-echo "Testing client made from ca false interCA"
+echo "Testing client made from interCA with ca set to false"
 echo " "
 
 printf 'GET /file.txt HTTP/1.0\r\n' > $HOME/exampleRequest.txt

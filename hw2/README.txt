@@ -9,6 +9,12 @@ Info:
   request is satisfied. This makes it easer/simpler to make a bash script
   that processes multiple clients.
 
+- Below, I focus on the verify error nums that appear. There is also a
+  paired ssl alert that also pops up on the other side (ie if verify error
+  appears on the serverlog, a corresponding ssl alert error shows up on
+  clientlog). Since I'm not sure which error is the focus, I list the verify
+  errors below. But all errors can be found by opening the serverlog.txt or
+  clientlog.txt
 
 Directions:
 
@@ -78,6 +84,11 @@ vanilla certificate. You can expect to see the below
      - client certificate created with only encryption as key usage
      - serverlog
 
+   - cafalse: error num 19 - self signed certificate 
+     - client certificate created by intermediate CA whose CA field was set
+       to false. Here, since the default server does not trust the root CA,
+       it puts this error. In the next test, we will see a different error
+     - serverlog
 
 
 4. On server window, please run server_acceptall. On client window, please
@@ -102,14 +113,43 @@ run client_acceptallServerTest.sh
      - client sends another CA's cert chain as its own
      - serverlog
 
+   - cafalse: error num 24 - invalid CA certificate
+     - client certificate created by intermediate CA whose CA field was set
+       to false. Since this server trusts all root CAs, it was able to
+       verify the certificate but it since the ca field was set to false, it
+       gives this error
+     - serverlog
 
-5. On server window, please run server_digsig. On client window, please run
-client_digsig. 
-  - 
-  
-  This produces unsupported certificate purpose error. What I
-did here was I removed the digital signature field from server and user
-keyUsage field. I also tried removing it from the ca and intermediate_ca
-keyUsage field as well. They both result in the same error. 
+   - nocertsign: error num 20 - unable to get local issuer certificate
+     - similar to above, I tried to remove the keyCertSign option from the
+       key usage to see what error it would give me
+     - serverlog
+
+
+5. On server window, please run server_eduemail.sh. On client window, please
+run client_subtreeViolationTest.sh
+  - Here, I added a nameconstraint field to the config file so that it
+    excludes a particular email address -- in this case email addresses
+    ending in .com
+
+  - eduemail: no error - works fine
+    - this certificate was created with an email address ending in .edu.
+      This should work and be able to get the file
+
+  - comemail: error num 48 - excluded subtree violation
+    - since this certificate was created with a .com email, the server
+      should reject it
+    - clientlog
+
+6. On server window, please run server_shorterchain.sh. On client window,
+please run client_longerchain.sh 
+  - Here, I removed the pathlen constraing from the config file so that
+    intermediate CAs can sign other intermediate CSRs. The server then
+    has a verify_depth option that checks that the depth of the certificate
+    chain cannot be greater than 1. Since the client certificate was signed
+    by a second intermediate CA, its depth is 2 and is rejected
+
+  - longerchain: error num 22 - certificate chain too long
+    - serverlog
 
 

@@ -12,5 +12,6 @@ echo "Testing client tests on acceptall server"
 ./client_badpathlen.sh
 ./client_onecertchain.sh
 ./client_wrongcertchain.sh
-
+./client_cafalse.sh
+./client_nocertsign.sh
 

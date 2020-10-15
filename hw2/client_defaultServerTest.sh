@@ -19,4 +19,5 @@ echo "Testing client tests"
 ./client_noauth.sh
 ./client_crlcheck.sh
 ./client_encryption.sh
+./client_cafalse.sh
 

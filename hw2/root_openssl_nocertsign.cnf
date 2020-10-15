@@ -89,18 +89,18 @@ emailAddress_default            =
 # Extensions for a typical CA (`man x509v3_config`).
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
-basicConstraints = critical, CA:false
+basicConstraints = critical, CA:true
 keyUsage = critical, digitalSignature, cRLSign
 
 [ v3_intermediate_ca ]
 # Extensions for a typical intermediate CA (`man x509v3_config`).
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
-basicConstraints = critical, CA:false #, pathlen:0
+basicConstraints = critical, CA:true #, pathlen:0
 keyUsage = critical, digitalSignature, cRLSign
 
 [ usr_cert ]
-# Extensions for client certificates (`man x509v3_config`).
+# Extensions for client certificates` (`man x509v3_config`).
 basicConstraints = CA:FALSE
 nsCertType = client, email
 nsComment = "OpenSSL Generated Client Certificate"
