@@ -3,6 +3,7 @@
 HOME=/home/mushu/security_1/hw2
 
 chmod +x $HOME/CA_bash.sh
+chmod +x $HOME/client_acceptallServerTest.sh
 chmod +x $HOME/client_acceptall.sh
 chmod +x $HOME/client_authLevel.sh
 chmod +x $HOME/client_badident.sh
@@ -19,7 +20,7 @@ chmod +x $HOME/client_default.sh
 chmod +x $HOME/client_defaultServerTest.sh
 chmod +x $HOME/client_der.sh
 chmod +x $HOME/client_digsig.sh
-chmod +x $HOME/client_edumail.sh
+chmod +x $HOME/client_eduemail.sh
 chmod +x $HOME/client_encryption.sh
 chmod +x $HOME/client_expired.sh
 chmod +x $HOME/client_longerchain.sh
@@ -42,8 +43,9 @@ chmod +x $HOME/client_wrongearly.sh
 chmod +x $HOME/client_wrongemail.sh
 chmod +x $HOME/client_wronghostname.sh
 chmod +x $HOME/client_wrongipaddr.sh
-chmod +x $HOME/client_makeClean.sh
-chmod +x $HOME/client_make.sh
+
+chmod +x $HOME/makeClean.sh
+chmod +x $HOME/make.sh
 
 chmod +x $HOME/server_acceptall.sh
 chmod +x $HOME/server_cafalse.sh

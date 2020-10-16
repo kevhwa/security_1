@@ -18,13 +18,16 @@ Info:
 
 Directions:
 
-1. There is 1 script [---]. Please run chmod +x on this file and run it. This
-will then make all the other bash scripts executable so you only have to do
-the chmod command once.
+0. Since this is a bash script that relies on absolute paths, please unpack
+this file inside the following directory
 
-2. run make. This will make all the certificates along with a clientlog.txt
-and serverlog.txt that will hold the outputs (including the transferred
-files and error messages)
+/home/mushu/security_1/hw2
+
+1. There is a script makeExec.sh. If the scripts are not executable when you
+unpack them, please run chmod +x on this file and run it. This will then make all the other bash scripts executable so you only have to do the chmod command once.
+
+2. run make.sh (./make.sh). This will make all the certificates along with a clientlog.txt and serverlog.txt that will hold the outputs (including the transferred
+file content and error messages).
 
 3. On one window (server window), please run default_server. On the other
 (client window), please run client_defaultServerTest. This is a bash script that
