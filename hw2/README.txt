@@ -153,3 +153,48 @@ please run client_longerchain.sh
     - serverlog
 
 
+7. On server window, please run server_acceptall.sh. On client window,
+please run client_trialTest.sh.
+  - Here, are a group of clients using certificates that aren't necessarily
+    working in the way that they are supposed to be. These are tests that I
+    will leave here to show what I tried to do. 
+
+  - badident: Currently works (able to connect with client)
+    - Here, I removed the subjectKeyIdentifier field from the usr_cert
+      config file. I wanted to get a subject mismatch error but it seems
+      this works.
+
+  - conflictingexpdate: Currently giving same error as expired date
+    - What I did here was create an expired certificate (one that lasts for
+      1 minute or so) but also specify that it lasts 100 days so that there
+      is a conflict. I was hoping this leads to some bug but it just gives
+      the same error as the expired certificate
+
+  - mismatch: currently works
+    - What I did here was give differing country, state, organization names
+      to a client certificate in hopes that since they are different from
+      the root, it might be rejected. 
+
+  - rejectemail: not working properly, asking for a trusted certificate?
+    - What I did here was I tried to create a CA that rejects certificates
+      that have the emailProtection keyUsage. There is an x509 command
+      called -addreject [emailProtection] that is supposed to add this
+      functionality to a Root CA but it is currently not working for me. 
+
+  - der: currently works
+    - What i did here was I used the x509 command to change the certificate
+      format from PEM to DER. And in the server, specified -certform PEM
+      in hopes that it would reject the client and produce an error.
+      However, the client still is able to connect and retrieve the file
+
+
+  - Some other things I've tried here that failed in s_client
+  - mismatchkey: tried to provide a different key to the cert
+  - broken: tried to edit a bit of the cert 
+
+
+8. You may notice there are some servers that are not being used. It's
+because they produce the same errors but on the server side. Since these
+won't be counted as different errors, I stopped replicating the errors on
+the server side but I still left the few I made in case you would like to
+test them.

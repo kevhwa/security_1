@@ -27,6 +27,8 @@ cp $HOME/root_openssl_cafalse.cnf $HOMEROOT/root_openssl_cafalse.cnf
 cp $HOME/root_openssl_nocertsign.cnf $HOMEROOT/root_openssl_nocertsign.cnf
 cp $HOME/root_openssl_pathlen.cnf $HOMEROOT/root_openssl_pathlen.cnf
 cp $HOME/root_openssl_sha2.cnf $HOMEROOT/root_openssl_sha2.cnf
+cp $HOME/root_openssl_rejectemail.cnf $HOMEROOT/root_openssl_rejectemail.cnf
+cp $HOME/root_openssl_therejectemail.cnf $HOMEROOT/root_openssl_therejectemail.cnf
 
 openssl req -config $HOMEROOT/root_openssl.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=rootCA' -passin pass:pass -key $HOMEROOT/private/ca.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out $HOMEROOT/certs/ca.cert.pem 
 
@@ -109,8 +111,24 @@ openssl req -config $HOMEROOT/root_openssl_sha2.cnf -subj '/C=US/ST=New York/O=C
 #sha1
 chmod 444 $HOMEROOT/certs/ca_sha2.cert.pem
 
+#
+### Creating ROOT CA that rejects email protection 
+#
+
+openssl genrsa -aes256 -passout pass:pass -out $HOMEROOT/private/ca_rejectemail.key.pem 4096
+
+chmod 400 $HOMEROOT/private/ca_rejectemail.key.pem
+
+openssl req -config $HOMEROOT/root_openssl_rejectemail.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=rootCArejectemail' -passin pass:pass -key $HOMEROOT/private/ca_rejectemail.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out $HOMEROOT/certs/ca_rejectemail.cert.pem 
+
+chmod 444 $HOMEROOT/certs/ca_rejectemail.cert.pem
+
+openssl x509 -in $HOMEROOT/certs/ca_rejectemail.cert.pem -addreject emailProtection -out $HOMEROOT/certs/ca_therejectemail.cert.pem
+
+chmod 444 $HOMEROOT/certs/ca_therejectemail.cert.pem
+
 # Create a file with all trusted root certificates
-cat $HOMEROOT/certs/ca_cafalse.cert.pem $HOMEROOT/certs/ca_comemail.cert.pem $HOMEROOT/certs/ca_nocertsign.cert.pem $HOMEROOT/certs/ca.cert.pem $HOMEROOT/certs/ca_digsig.cert.pem $HOMEROOT/certs/ca_unrecognized.cert.pem $HOMEROOT/certs/ca_pathlen.cert.pem $HOMEROOT/certs/ca_sha2.cert.pem > $HOMEROOT/certs/ca_all.cert.pem
+cat $HOMEROOT/certs/ca_cafalse.cert.pem $HOMEROOT/certs/ca_comemail.cert.pem $HOMEROOT/certs/ca_nocertsign.cert.pem $HOMEROOT/certs/ca.cert.pem $HOMEROOT/certs/ca_digsig.cert.pem $HOMEROOT/certs/ca_unrecognized.cert.pem $HOMEROOT/certs/ca_pathlen.cert.pem $HOMEROOT/certs/ca_sha2.cert.pem $HOMEROOT/certs/ca_therejectemail.cert.pem > $HOMEROOT/certs/ca_all.cert.pem
 
 chmod 444 $HOMEINTER/certs/ca_all.cert.pem
 ############################################################################3#####
@@ -998,4 +1016,46 @@ openssl ca -config $HOMEINTER/inter_openssl.cnf  -passin pass:pass -extensions u
 
 chmod 444 $HOMEINTER/certs/www.example_client_sha1.com.cert.pem
 
+#
+# Creating a client certificate that rejects certificates with emailProtection
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_rejectemail.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_rejectemail.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEROOT/root_openssl_therejectemail.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientrejectemail.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_rejectemail.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_rejectemail.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEROOT/root_openssl_therejectemail.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_rejectemail.com.csr.pem -out $HOMEINTER/certs/www.example_client_rejectemail.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_rejectemail.com.cert.pem
+
+#
+# Creating a client certificate in DER
+#
+
+# Create a key pair for the client
+openssl genrsa -aes256 -passout pass:pass -out $HOMEINTER/private/www.example_client_pemtoder.com.key.pem 2048
+
+chmod 400 $HOMEINTER/private/www.example_client_pemtoder.com.key.pem
+
+# Create a CSR for client 1
+# Common Name must be a fully qualified domain name
+
+openssl req -config $HOMEINTER/inter_openssl.cnf -subj '/C=US/ST=New York/O=COMS4181 Hw2/CN=www.exampleclientpemtoder.com' -passin pass:pass -key $HOMEINTER/private/www.example_client_pemtoder.com.key.pem -new -sha256 -out $HOMEINTER/csr/www.example_client_pemtoder.com.csr.pem
+
+# Intermediate CA signs client server CSR
+
+openssl ca -config $HOMEINTER/inter_openssl.cnf  -passin pass:pass -extensions usr_cert -days 375 -notext -md sha256 -in $HOMEINTER/csr/www.example_client_pemtoder.com.csr.pem -out $HOMEINTER/certs/www.example_client_pemtoder.com.cert.pem -batch
+
+chmod 444 $HOMEINTER/certs/www.example_client_pemtoder.com.cert.pem
+openssl x509 -in $HOMEINTER/certs/www.example_client_pemtoder.com.cert.pem -inform PEM -out $HOMEINTER/certs/www.example_client_der.com.cert.der -outform DER
+
+chmod 444 $HOMEINTER/certs/www.example_client_der.com.cert.der
 

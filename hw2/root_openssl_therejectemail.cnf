@@ -16,8 +16,8 @@ serial            = $dir/serial
 RANDFILE          = $dir/private/.rand
 
 # The root key and root certificate.
-private_key       = $dir/private/ca_sha2.key.pem
-certificate       = $dir/certs/ca_sha2.cert.pem
+private_key       = $dir/private/ca_rejectemail.key.pem
+certificate       = $dir/certs/ca_therejectemail.cert.pem
 
 # For certificate revocation lists.
 crlnumber         = $dir/crlnumber
@@ -107,7 +107,7 @@ nsComment = "OpenSSL Generated Client Certificate"
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth, emailProtection
+extendedKeyUsage = clientAuth
 
 [ server_cert ]
 # Extensions for server certificates (`man x509v3_config`).

@@ -26,7 +26,7 @@ crl_extensions    = crl_ext
 default_crl_days  = 30
 
 # SHA-1 is deprecated, so use SHA-2 instead.
-default_md        = sha-2
+default_md        = SHA-2
 
 name_opt          = ca_default
 cert_opt          = ca_default
@@ -62,7 +62,7 @@ distinguished_name  = req_distinguished_name
 string_mask         = utf8only
 
 # SHA-1 is deprecated, so use SHA-2 instead.
-default_md          = sha-2
+default_md          = SHA-2
 
 # Extension to add when the -x509 option is used.
 x509_extensions     = v3_ca

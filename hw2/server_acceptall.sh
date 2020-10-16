@@ -11,4 +11,4 @@ echo "***"
 echo "Default placebo server"
 echo " "
 
-openssl s_server -accept $PORT -cert $HOMEINTER/certs/www.example_server.com.cert.pem -cert_chain $HOMEINTER/certs/ca-chain.cert.pem -key $HOMEINTER/private/www.example_server.com.key.pem -pass pass:pass -Verify $DEPTH -CApath $HOMEROOT/certs -CAfile $HOMEROOT/certs/ca_all.cert.pem -www -HTTP -verify_return_error >> $HOME/serverlog.txt 2>&1 
+openssl s_server -accept $PORT -cert $HOMEINTER/certs/www.example_server.com.cert.pem -cert_chain $HOMEINTER/certs/ca-chain.cert.pem -key $HOMEINTER/private/www.example_server.com.key.pem -pass pass:pass -certform PEM -Verify $DEPTH -CApath $HOMEROOT/certs -CAfile $HOMEROOT/certs/ca_all.cert.pem -www -HTTP -verify_return_error >> $HOME/serverlog.txt 2>&1 
