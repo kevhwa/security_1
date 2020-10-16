@@ -1,4 +1,4 @@
-~/bin/bash
+#~/bin/bash
 
 HOME=/home/mushu/security_1/hw2
 
