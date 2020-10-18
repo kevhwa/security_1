@@ -1,1 +1,0 @@
-GET /file.txt HTTP/1.0

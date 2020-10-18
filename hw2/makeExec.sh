@@ -19,6 +19,7 @@ chmod +x $HOME/client_default3.sh
 chmod +x $HOME/client_default.sh
 chmod +x $HOME/client_defaultServerTest.sh
 chmod +x $HOME/client_der.sh
+chmod +x $HOME/client_des.sh
 chmod +x $HOME/client_digsig.sh
 chmod +x $HOME/client_eduemail.sh
 chmod +x $HOME/client_encryption.sh
@@ -33,7 +34,6 @@ chmod +x $HOME/client_onecertchain.sh
 chmod +x $HOME/client_rejectemail.sh
 chmod +x $HOME/client_selfsigned.sh
 chmod +x $HOME/client_sha1.sh
-chmod +x $HOME/client_sha2.sh
 chmod +x $HOME/client_signing.sh
 chmod +x $HOME/client_subtreeViolationTest.sh
 chmod +x $HOME/client_tooearly.sh

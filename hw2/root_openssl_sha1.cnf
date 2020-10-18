@@ -16,8 +16,8 @@ serial            = $dir/serial
 RANDFILE          = $dir/private/.rand
 
 # The root key and root certificate.
-private_key       = $dir/private/ca_sha2.key.pem
-certificate       = $dir/certs/ca_sha2.cert.pem
+private_key       = $dir/private/ca_sha1.key.pem
+certificate       = $dir/certs/ca_sha1.cert.pem
 
 # For certificate revocation lists.
 crlnumber         = $dir/crlnumber
@@ -26,7 +26,7 @@ crl_extensions    = crl_ext
 default_crl_days  = 30
 
 # SHA-1 is deprecated, so use SHA-2 instead.
-default_md        = sha256
+default_md        = sha1
 
 name_opt          = ca_default
 cert_opt          = ca_default
@@ -62,7 +62,7 @@ distinguished_name  = req_distinguished_name
 string_mask         = utf8only
 
 # SHA-1 is deprecated, so use SHA-2 instead.
-default_md          = sha256
+default_md          = sha1
 
 # Extension to add when the -x509 option is used.
 x509_extensions     = v3_ca
