@@ -19,19 +19,24 @@ void skipNext(void);
 void resizeList(char **, int *);
 int checkMailCount(char *);
 FILE *getTempFile(char **);
+FILE *getRecvFile(char *);
 char *getMailCountString(char *);
+char *getFromString(char *);
+char *getToString(char **);
+
 
 int main(int argc, char **argv) {
 
 	char requestLine[1000];
+	char fromLine[1000];
 	char **rec_list = malloc (5 * sizeof(*rec_list));
 	int list_count = 0;
-	char sender[1000];
+	char *sender;
 	int r_count = 0;
 
 
 	//First check mail from 
-	if (fgets(sender, sizeof(sender), stdin) == NULL) {
+	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
 		die("fgets failed\n");	
 	}
 	//sender[strlen(sender) - 1] = '\0';
@@ -40,22 +45,20 @@ int main(int argc, char **argv) {
 	char *method = "";
 	char *user = "";
 	
-	method = strtok(sender, separator);
-	user = strtok(NULL, separator);
+	method = strtok(fromLine, separator);
+	sender = strtok(NULL, separator);
 
 	//trimming name
-	//printf("length of name: %ld\n", strlen(user));
-	user[strlen(user) - 1] = '\0';
-	user[strlen(user) - 1] = '\0';
-	user++;
-	printf("trimmed user: %s\n", user);
+	sender[strlen(sender) - 1] = '\0'; //get rid of new line
+	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
+	sender++; //get rid of starting <
+	//printf("trimmed user: %s\n", sender);
 
 	while (1) {
 
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			die("fgets failed\n");	
 		}
-
 		//printf("debug: %s\n", requestLine);
 
 		//check if this is the data line.
@@ -65,7 +68,6 @@ int main(int argc, char **argv) {
 				skipNext();
 				break;
 			}
-			//printf("Found DATA\n");
 			break;
 		}
 		
@@ -76,16 +78,19 @@ int main(int argc, char **argv) {
 		// add to list of recipients
 		method = strtok(requestLine, separator);
 		user = strtok(NULL, separator);
-		//printf("user: %s\n", user);
-		user[strlen(user) - 1] = '\0';
-		user[strlen(user) - 1] = '\0';
-		user++;
+		
+		user[strlen(user) - 1] = '\0'; // get rid of new line
+		user[strlen(user) - 1] = '\0'; // get rid of ending >
+		user++; // get rid of starting <
 		method = method;
 
 		//check if user is in mailbox. If not continue;
+		if (checkValidUser(user) != 1) {
+			continue;
+		}
 
-		char *recvr = malloc(strlen(user)); 
-		memcpy(recvr, user, strlen(user));
+		char *recvr = malloc(strlen(user) + 1); 
+		strcpy(recvr, user);
 
 		rec_list[r_count] = recvr;
 		r_count++;
@@ -96,8 +101,6 @@ int main(int argc, char **argv) {
 	//for everything else we read in, we write to the file
 	
 	FILE *fp = getTempFile(rec_list);
-	fclose(fp);
-	printf("postfile\n");
 
 	//write to temp file
 	while (1) {
@@ -108,17 +111,30 @@ int main(int argc, char **argv) {
 		
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 			printf("reached end of data\n");
-		break;	
+			break;	
 		} else {
-			
-		printf("reading data: \n");
-			printf("%s\n", requestLine);
+			fputs(requestLine, fp);	
 		}
 	}
 
-	//for each receiver, open temp file, write to mailbox
-	
-	
+	// now tmp file has all the messages
+	char *msg_from = getFromString(sender);
+	char *msg_to = getToString(rec_list);
+
+	//printf("from: %s\n", msg_from);
+	//printf("to: %s\n", msg_to);
+
+	char **index = rec_list;
+	char *temp;
+	while ((temp = *index++)) {
+		FILE *fp1 = getRecvFile(temp);
+		//open file using rec_list[i < rec_count]
+		fputs(msg_from, fp1);
+		fputs(msg_to, fp1);
+		//write from and to 
+		//fseek to beginning of temp file, write to mailbox
+		fclose(fp1);
+	}
 	
 	
 	printf("in reclist: \n");
@@ -126,7 +142,11 @@ int main(int argc, char **argv) {
 		printf("%s\n", rec_list[i]);
 		free(rec_list[i]);
 	}
+
 	free(rec_list);
+	free(msg_from);
+	free(msg_to);
+	fclose(fp);
 
 }
 
@@ -154,9 +174,6 @@ int checkValidUser(char *user) {
 	if ((dfd = opendir("test/mail")) == NULL) {
 		die("Can't open mail dir\n");
 	}
-
-	//char dir_name[100];
-	//char new_name_qfd[100];
 
 	while ((dp = readdir(dfd)) != NULL)
 	{
@@ -229,13 +246,6 @@ FILE *getTempFile(char **rec_list) {
 	char *rec_one = rec_list[0];
 	//printf("pre checkmail %s\n", rec_one);
 
-/*
-Move to individual write
-	char path[] = "test/mail/";
-	char filePath[strlen(path) + strlen(user) + strlen(num)];
-	sprintf(filePath, "%s%s%s", path,recipient, num);
-	FILE *fp = fopen(filePath, "w+");
-*/
 	//open a tmp file
 	char *num = getMailCountString(rec_one);
 
@@ -247,11 +257,46 @@ Move to individual write
 	strcat(filePath, rec_one);
 	strcat(filePath, num);
 
-	printf("temp file path: %s\n", filePath);
-	printf("%s\n", path);
-	printf("%s\n", rec_one);
-	printf("%s\n", num);
-	printf("seg fault?\n");
+	//printf("temp file path: %s\n", filePath);
+	//printf("%s\n", path);
+	//printf("%s\n", rec_one);
+	//printf("%s\n", num);
+	//printf("seg fault?\n");
+	FILE *fp = fopen(filePath, "w+");
+	
+	if (fp == NULL) {
+		die("fopen failed");
+	}
+
+	free(num);
+	return fp;
+
+}
+
+FILE *getRecvFile(char *recver) {
+
+/*
+Move to individual write
+	char path[] = "test/mail/";
+	char filePath[strlen(path) + strlen(user) + strlen(num)];
+	sprintf(filePath, "%s%s%s", path,recipient, num);
+	FILE *fp = fopen(filePath, "w+");
+*/
+	//open a tmp file
+	char *num = getMailCountString(recver);
+
+	char path[] = "test/mail/";
+	char filePath[strlen(path) + strlen(recver) + strlen(num) + 1];
+	//sprintf(filePath, "%s%s%s", path, rec_one, num);
+	strcpy(filePath, path);
+	strcat(filePath, recver);
+	strcat(filePath, num);
+
+	printf("file path: %s\n", filePath);
+	//printf("%s\n", path);
+	//printf("%s\n", rec_one);
+	//printf("%s\n", num);
+	//printf("seg fault?\n");
 	FILE *fp = fopen(filePath, "w+");
 	
 	if (fp == NULL) {
@@ -264,7 +309,7 @@ Move to individual write
 }
 
 char *getMailCountString(char *user) {
-	int mailCount = checkMailCount(user);
+	int mailCount = checkMailCount(user) + 1;
 
 	int dig = 1;
 	for (int i = 0; i < 5; i++) {
@@ -293,6 +338,44 @@ char *getMailCountString(char *user) {
 	num[5] = '\0';
 	printf("new mail count: %s\n", num);
 	return num;
+}
+
+char *getFromString(char *sender) {
+	char from[] = "From : ";
+	char *fromString = malloc(strlen(from) + strlen(sender) + 1);
+	strcpy(fromString, from);
+	strcat(fromString, sender);
+
+	fromString[strlen(sender) + strlen(from)] = '\0'; //null terminate string
+	return fromString;
+}
+
+char *getToString(char **list) {
+	char to[] = "To : ";
+	char next[] = ", ";
+	int size = 0;
+
+	char **index = list;
+	char *temp;
+
+	//size += strlen(to);
+	size += strlen(*index++);
+
+	while ((temp = *index++)) {
+		size += (strlen(next) + strlen(temp));
+	}
+
+	char *toString = malloc(strlen(to) + size + 1);
+	
+	strcpy(toString, to);
+	strcat(toString, *list++);
+
+	while ((temp = *list++)) {
+		strcat(toString, next);
+		strcat(toString, temp);
+	}
+	toString[strlen(to) + size] = '\0';
+	return toString;
 }
 
 //misc code from checking directory name
