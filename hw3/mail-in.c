@@ -23,6 +23,7 @@ Q
 #include <dirent.h>
 
 #define BUFF_SIZE 4096
+#define PTR_SIZE 8
 
 static void die(const char *message) {
 	perror(message);
@@ -32,11 +33,16 @@ static void die(const char *message) {
 int checkEOF(void); 
 int checkValidUser(char *); 
 void skipNext(void);
+void resizeList(char **, int *);
 
 int main(int argc, char **argv) {
 
-	char requestLine[1000];       
-	
+	char requestLine[1000];
+	char **rec_list = malloc (5 * sizeof(*rec_list));
+	int list_count = 0;
+	char sender[1000];
+	int r_count = 0;
+
 	while(1) {
 		
 		//Check if EOF
@@ -47,15 +53,17 @@ int main(int argc, char **argv) {
 		}
 		
 		//First check mail from 
-		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+		if (fgets(sender, sizeof(requestLine), stdin) == NULL) {
 			die("fgets failed\n");	
 		}
+
+		sender[strlen(sender) - 1] = '\0';
 
 		char *separator = ":";
 		char *method = "";
 		char *user = "";
 
-		method = strtok(requestLine, separator);
+		method = strtok(sender, separator);
 		user = strtok(NULL, separator);
 
 		if (strcasecmp(method, "mail from") != 0) {
@@ -64,10 +72,9 @@ int main(int argc, char **argv) {
 			continue;
 		} else {
 			printf("Passed mail from check, mail from : %s\n", user);
+			
 			//trimming name
-
-			printf("length of name: %ld\n", strlen(user));
-			user[strlen(user) - 1] = 0;
+			//printf("length of name: %ld\n", strlen(user));
 			user[strlen(user) - 1] = 0;
 			user++;
 			printf("trimmed user: %s\n", user);
@@ -79,14 +86,19 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		int r_count = 0;
+
+
 		while (1) {
-			// Then check for rcpt. This part should be in a loop
+			
 			if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 				die("fgets failed\n");	
 			}
 
-			printf("debug: %s\n", requestLine);
+			char *recvr = malloc(strlen(requestLine)); 
+			memcpy(recvr, requestLine, strlen(requestLine));
+			recvr[strlen(requestLine) - 1] = '\0'; //overwrite newline
+
+			//printf("debug: %s\n", requestLine);
 	
 			//check if this is the data line.
 			if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
@@ -95,26 +107,40 @@ int main(int argc, char **argv) {
 					skipNext();
 					break;
 				}
-				printf("Found DATA\n");
+				//printf("Found DATA\n");
 				break;
 			}
 
+			if (r_count == list_count) {
+				resizeList(rec_list, &list_count);
+			}
 
+			// add to list of recipients
 			method = strtok(requestLine, separator);
 			user = strtok(NULL, separator);
+			user[strlen(user) - 1] = 0;
+			user++;
 
 			if (strcasecmp(method, "rcpt to") != 0) {
 				fprintf(stderr, "Error in request, skipping\n");
 				skipNext();
 				break;
 			} else {
-				printf("passed rcpt to test, sending to : %s\n", user); 
+				printf("passed rcpt to test, sending to : %s\n", user);
+				rec_list[r_count] = recvr;
 				r_count++;
 				//trim user name;
 			}
 
 		}
 
+		//Have to fork here since now we know there's nothing wrong with the order
+		//pipe
+		//fork
+		//send sender
+		//send reclist
+		//send the data
+		
 		//read in data 
 		while (1) {
 		
@@ -127,18 +153,18 @@ int main(int argc, char **argv) {
 				break;	
 			} else {
 				
-				printf("read data: \n");
+				printf("reading data: \n");
 				printf("%s\n", requestLine);
 			}
 		}
 	}
-        // read in from standard in, this will give us the first line of MAIL FROM
-        // verify that this user exists. If not, print to std err and loop until you hit the "."
 
-        //fork or read in entire file, create a file then just read the whole thing to child in one batch
-
-        //kill child process
-        //loop back
+	printf("in reclist: \n");
+	for (int i = 0; i < r_count; i++) {
+		printf("%s\n", rec_list[i]);
+		free(rec_list[i]);
+	}
+	free(rec_list);
 
 }
 
@@ -203,7 +229,15 @@ void skipNext(void) {
 	}
 }
 
-// misc code from checking directory name
+void resizeList(char **list, int *count) {
+	char **temp = realloc(list, PTR_SIZE * *count * 2);
+	*count = *count * 2;
+
+	temp = temp;
+}
+
+
+//misc code from checking directory name
 //
 //struct stat stbuf;
 //		sprintf(dir_name, "%s"dp->d_name);
