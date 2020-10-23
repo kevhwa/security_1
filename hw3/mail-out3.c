@@ -17,6 +17,9 @@ int checkEOF(void);
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
+int checkMailCount(char *);
+FILE *getTempFile(char **);
+char *getMailCountString(char *);
 
 int main(int argc, char **argv) {
 
@@ -31,7 +34,7 @@ int main(int argc, char **argv) {
 	if (fgets(sender, sizeof(sender), stdin) == NULL) {
 		die("fgets failed\n");	
 	}
-	sender[strlen(sender) - 1] = '\0';
+	//sender[strlen(sender) - 1] = '\0';
 
 	char *separator = ":";
 	char *method = "";
@@ -39,7 +42,7 @@ int main(int argc, char **argv) {
 	
 	method = strtok(sender, separator);
 	user = strtok(NULL, separator);
-		
+
 	//trimming name
 	//printf("length of name: %ld\n", strlen(user));
 	user[strlen(user) - 1] = '\0';
@@ -48,7 +51,7 @@ int main(int argc, char **argv) {
 	printf("trimmed user: %s\n", user);
 
 	while (1) {
-		
+
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			die("fgets failed\n");	
 		}
@@ -79,6 +82,8 @@ int main(int argc, char **argv) {
 		user++;
 		method = method;
 
+		//check if user is in mailbox. If not continue;
+
 		char *recvr = malloc(strlen(user)); 
 		memcpy(recvr, user, strlen(user));
 
@@ -86,17 +91,18 @@ int main(int argc, char **argv) {
 		r_count++;
 		
 		}
-		//Have to fork here since now we know there's nothing wrong with the order
-	//pipe
-	//fork
-	//send sender
-	//send reclist
-	//send the data
+	//At this point, we have all the sender and receiver data
+	//we need to get file count and open the file
+	//for everything else we read in, we write to the file
 	
-	//read in data 
+	FILE *fp = getTempFile(rec_list);
+	fclose(fp);
+	printf("postfile\n");
+
+	//write to temp file
 	while (1) {
 	
-		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {    
 			die("fgets failed\n");	
 	}
 		
@@ -110,6 +116,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	//for each receiver, open temp file, write to mailbox
+	
+	
+	
+	
 	printf("in reclist: \n");
 	for (int i = 0; i < r_count; i++) {
 		printf("%s\n", rec_list[i]);
@@ -187,6 +198,102 @@ void resizeList(char **list, int *count) {
 	temp = temp;
 }
 
+int checkMailCount(char *user) {
+
+	struct dirent *dp;
+	DIR *dfd;
+	int count = 0;
+	char path[] = "test/mail/";
+	char dir_name[strlen(path) + strlen(user)];
+
+	sprintf(dir_name, "%s%s", path, user);
+	printf("path name %s\n", dir_name);
+
+	//*********** need to change when you move exec to bin******
+	if ((dfd = opendir(dir_name)) == NULL) {
+		die("Can't open mail dir in checkMailCount\n");
+	}
+
+	while ((dp = readdir(dfd)) != NULL) {
+		count++;
+	}
+
+	if (count >= 99999) {
+		die("too much mail\n");
+	}
+
+	return count;
+}
+
+FILE *getTempFile(char **rec_list) {
+	char *rec_one = rec_list[0];
+	//printf("pre checkmail %s\n", rec_one);
+
+/*
+Move to individual write
+	char path[] = "test/mail/";
+	char filePath[strlen(path) + strlen(user) + strlen(num)];
+	sprintf(filePath, "%s%s%s", path,recipient, num);
+	FILE *fp = fopen(filePath, "w+");
+*/
+	//open a tmp file
+	char *num = getMailCountString(rec_one);
+
+	printf("prefile\n");
+	char path[] = "test/tmp/";
+	char filePath[strlen(path) + strlen(rec_one) + strlen(num) + 1];
+	//sprintf(filePath, "%s%s%s", path, rec_one, num);
+	strcpy(filePath, path);
+	strcat(filePath, rec_one);
+	strcat(filePath, num);
+
+	printf("temp file path: %s\n", filePath);
+	printf("%s\n", path);
+	printf("%s\n", rec_one);
+	printf("%s\n", num);
+	printf("seg fault?\n");
+	FILE *fp = fopen(filePath, "w+");
+	
+	if (fp == NULL) {
+		die("fopen failed");
+	}
+
+	free(num);
+	return fp;
+
+}
+
+char *getMailCountString(char *user) {
+	int mailCount = checkMailCount(user);
+
+	int dig = 1;
+	for (int i = 0; i < 5; i++) {
+		if(mailCount/10 > 0) {
+			dig++;
+		}
+	}
+	
+	char *num = malloc(sizeof(char) * 5 + 1);
+	int zero = 5 - dig;
+	char temp[5];
+	sprintf(temp, "%d", mailCount);
+	printf("mail count: %d\n", temp[0]);
+	int k = 0;
+
+	for (int i = 0; i < 5; i++) {
+		if (zero > 0) {
+			num[i] = '0';
+			zero--;
+		} else {
+			//printf("here\n");
+			num[i] = temp[k];
+			k++;
+		}
+	}
+	num[5] = '\0';
+	printf("new mail count: %s\n", num);
+	return num;
+}
 
 //misc code from checking directory name
 //
