@@ -1,26 +1,17 @@
 /*
-1. get email
-- read in with fgets. This will get us sender and receiver until you hit DATA
-- Verify that sender is in the mailbox
-       - if not send error message but continue
-
-2. fork, create a pipe from OS and call mail-out and pipe in the corresponding data
-
-3. printf sender message, then printf all the receiver messages
-4. fgets and check until you see just a .
-5. kill child process somehow
-6. loop back to 3
-
-
 Q
 - how does mail out check who the recpient is? Does it read the email?
 - can we assume input files will be properly formatted? like each message will end with a period, no typos etc
 */
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 
 #define BUFF_SIZE 4096
 #define PTR_SIZE 8
@@ -30,117 +21,84 @@ static void die(const char *message) {
 	exit(1);
 }
 
+struct headers {
+	char **rec_list;
+	int size;
+	int count;
+};
+
 int checkEOF(void); 
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
+int getSender(struct headers); 
+int getRecvr(struct headers, int);
+
 
 int main(int argc, char **argv) {
 
-	char requestLine[1000];
-	char **rec_list = malloc (5 * sizeof(*rec_list));
-	int list_count = 0;
-	char sender[1000];
-	int r_count = 0;
+	struct headers list;
 
 	while(1) {
-		
+		list.rec_list = malloc (5 * sizeof(list.rec_list));
+		list.size = 5;
+		list.count = 0;
+		int r_count = 0;
+
 		//Check if EOF
-		int check;
-		if ((check = checkEOF()) == 1) {
+		
+		if (checkEOF() == 1) {
 			printf("EOF REACHED\n");
 			break;
 		}
-		
-		//First check mail from 
-		if (fgets(sender, sizeof(requestLine), stdin) == NULL) {
-			die("fgets failed\n");	
-		}
 
-		sender[strlen(sender) - 1] = '\0';
-
-		char *separator = ":";
-		char *method = "";
-		char *user = "";
-
-		method = strtok(sender, separator);
-		user = strtok(NULL, separator);
-
-		if (strcasecmp(method, "mail from") != 0) {
-			fprintf(stderr, "Error in request, skipping\n");
-			skipNext();
+		if (getSender(list) < 0) 
 			continue;
-		} else {
-			printf("Passed mail from check, mail from : %s\n", user);
-			
-			//trimming name
-			//printf("length of name: %ld\n", strlen(user));
-			user[strlen(user) - 1] = 0;
-			user++;
-			printf("trimmed user: %s\n", user);
-
-			if (checkValidUser(user) != 1) {
-				printf("Not valid sender\n");
-				skipNext();
-				continue;
-			}
-		}
-
-
 
 		while (1) {
-			
-			if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
-				die("fgets failed\n");	
-			}
-
-			char *recvr = malloc(strlen(requestLine)); 
-			memcpy(recvr, requestLine, strlen(requestLine));
-			recvr[strlen(requestLine) - 1] = '\0'; //overwrite newline
-
-			//printf("debug: %s\n", requestLine);
-	
-			//check if this is the data line.
-			if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
-				if (r_count == 0) {
-					fprintf(stderr, "DATA out of place, skipping\n");
-					skipNext();
-					break;
-				}
-				//printf("Found DATA\n");
+			if (getRecvr(list, r_count) < 0)
 				break;
-			}
-
-			if (r_count == list_count) {
-				resizeList(rec_list, &list_count);
-			}
-
-			// add to list of recipients
-			method = strtok(requestLine, separator);
-			user = strtok(NULL, separator);
-			user[strlen(user) - 1] = 0;
-			user++;
-
-			if (strcasecmp(method, "rcpt to") != 0) {
-				fprintf(stderr, "Error in request, skipping\n");
-				skipNext();
-				break;
-			} else {
-				printf("passed rcpt to test, sending to : %s\n", user);
-				rec_list[r_count] = recvr;
-				r_count++;
-				//trim user name;
-			}
-
 		}
 
-		//Have to fork here since now we know there's nothing wrong with the order
-		//pipe
-		//fork
-		//send sender
-		//send reclist
-		//send the data
+
+		int fd[2];
+		if (pipe(fd) < 0)
+			die("pipe error");
+
+		pid_t pid = fork();
+		//char mailout[] = "mail-out";
+
+		if(pid < 0) {
+			die("Fork failed\n");
+		} else if (pid == 0) {
+			if (dup2(fd[0], STDIN_FILENO) != STDIN_FILENO)
+				die("Can't reconnect stdin\n");
+			close(fd[0]);
+			close(fd[1]);
+			
+			if (execlp("./mail-out", "mail-out", NULL) < 0)
+				die("execl failed\n");
+
+		} else{
+			sleep(1);
+			close(fd[0]);
+
+/*			if (write(fd[1], afromLine, strlen(afromLine)) != strlen(afromLine)) {
+				die("write error\n");
+			}
+*/			
+			char **index = list.rec_list; 
+			while ( *index != NULL) {
+				if (write(fd[1], *index, strlen(*index)) != strlen(*index)) {
+					die("write error\n");
+				}
 		
+				printf("parent: %s\n", *index);
+				index++;
+			}
+
+		char requestLine[1000];
+
 		//read in data 
 		while (1) {
 		
@@ -149,23 +107,33 @@ int main(int argc, char **argv) {
 			}
 			
 			if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-				printf("reached end of data\n");
+				printf("parent: reached end of data\n");
+				if (write(fd[1], requestLine, strlen(requestLine)) != strlen(requestLine)) {
+					die("write error\n");
+				}
+
 				break;	
 			} else {
-				
-				printf("reading data: \n");
-				printf("%s\n", requestLine);
+				if (write(fd[1], requestLine, strlen(requestLine)) != strlen(requestLine)) {
+					die("write error\n");
+				}
+
+
 			}
 		}
-	}
 
-	printf("in reclist: \n");
-	for (int i = 0; i < r_count; i++) {
-		printf("%s\n", rec_list[i]);
-		free(rec_list[i]);
-	}
-	free(rec_list);
+		close(fd[1]);
+		for (int i = 0; i < list.count; i++) {
+			free(list.rec_list[i]);
+		}
+		free(list.rec_list);
 
+		printf("\nwaiting for child\n");
+		pid_t childpid = waitpid(-1, NULL, 0);
+		if (childpid < -1)
+			die("waitpid failed\n");
+		}
+	}
 }
 
 int checkEOF(void) {
@@ -228,34 +196,120 @@ void skipNext(void) {
 		}
 	}
 }
-
+/*
 void resizeList(char **list, int *count) {
 	char **temp = realloc(list, PTR_SIZE * *count * 2);
 	*count = *count * 2;
 
 	temp = temp;
 }
+*/
+void addLine(struct headers list, char *line) {
+	list.rec_list[list.count++] = line;
+	list.count++;
+
+	if (list.count == list.size) {
+		char **temp = realloc(list.rec_list, PTR_SIZE * (list.size * 2));
+		list.rec_list = temp;
+		list.size *= 2;
+	}
 
 
-//misc code from checking directory name
-//
-//struct stat stbuf;
-//		sprintf(dir_name, "%s"dp->d_name);
-//		if(stat(dir_name, &stbuf ) == -1 ) {
-//			printf("Unable to stat file: %s\n",dir_name) ;
-//			continue ;
-//		}
+}
 
-		//if ((stbuf.st_mode & S_IFMT) == S_IFDIR ) {
-		//	continue;
-			// Skip directories
-		//}
-//		else
-//		{
-//			char* new_name = get_new_name( dp->d_name ) ;// returns the new string
-//			// after removing reqd part
-//			sprintf(new_name_qfd,"%s/%s",dir,new_name) ;
-//			rename( filename_qfd , new_name_qfd ) ;
+int getSender(struct headers list) {
+	
+	char fromLine[1000];
+	char *sender;
+	char *separator = ":";
+	char *method = "";
 
-//		}
+	//First check mail from 
+	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
+		die("fgets failed\n");	
+	}
+	
+	char *afromLine = malloc(strlen(fromLine)); 
+	strcpy(afromLine, fromLine);
+	
+	method = strtok(fromLine, separator);
+	sender = strtok(NULL, separator);
+	
+	sender[strlen(sender) - 1] = '\0'; // get rid of new line
+	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
+	sender++;
 
+	if (strcasecmp(method, "mail from") != 0) {
+		fprintf(stderr, "Error in request, skipping\n");
+		skipNext();
+		return -1;
+	} else {
+		printf("Passed mail from check, mail from : %s\n", sender);
+		
+		if (checkValidUser(sender) != 1) {
+			printf("Not valid sender\n");
+			skipNext();
+			return -1;;
+		}
+	}
+
+	addLine(list, afromLine);
+
+	return 1;
+
+}
+
+int getRecvr(struct headers list, int r_count) {
+	
+	char requestLine[1000];
+	char *separator = ":";
+	char *method = "";
+	char *user = "";
+
+	if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+		die("fgets failed\n");	
+	}
+
+	char *recvr = malloc(strlen(requestLine)); 
+	strcpy(recvr, requestLine);
+	//recvr[strlen(requestLine) - 1] = '\0'; //overwrite newline
+	//printf("debug: %s\n", requestLine);
+	
+	//check if this is the data line.
+	if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
+		if (r_count == 0) {
+			fprintf(stderr, "DATA out of place, skipping\n");
+			skipNext();
+			return -1;
+		}
+		addLine(list, recvr);
+		//printf("Found DATA\n");
+		return -1;
+	}
+/*
+	if (r_count + 1 == list_count) {
+		resizeList(rec_list, &list_count);
+	}
+*/
+	// add to list of recipients
+	method = strtok(requestLine, separator);
+	user = strtok(NULL, separator);
+	user[strlen(user) - 1] = 0;
+	user++;
+
+	if (strcasecmp(method, "rcpt to") != 0) {
+		fprintf(stderr, "Error in request, skipping\n");
+		skipNext();
+		return -1;
+	} else {
+		printf("passed rcpt to test, sending to : %s\n", user);
+		
+		addLine(list, recvr);
+		
+		//rec_list[r_count] = recvr;
+		r_count++;
+		//trim user name;
+	}
+
+	return 1;
+}
