@@ -8,7 +8,7 @@ LDFLAGS = -g -lpthread
 #$(TARGETS):
 #$(OBJS):
 
-objects = mail-in mail-out3
+objects = mail-in mail-out
 all: $(objects)
 
 $(objects): %: %.c
