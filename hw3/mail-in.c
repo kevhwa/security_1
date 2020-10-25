@@ -31,8 +31,8 @@ int checkEOF(void);
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
-int getSender(struct headers); 
-int getRecvr(struct headers, int);
+int getSender(struct headers *); 
+int getRecvr(struct headers *, int *);
 
 
 int main(int argc, char **argv) {
@@ -52,11 +52,11 @@ int main(int argc, char **argv) {
 			break;
 		}
 
-		if (getSender(list) < 0) 
+		if (getSender(&list) < 0) 
 			continue;
 
 		while (1) {
-			if (getRecvr(list, r_count) < 0)
+			if (getRecvr(&list, &r_count) < 0)
 				break;
 		}
 
@@ -87,14 +87,13 @@ int main(int argc, char **argv) {
 				die("write error\n");
 			}
 */			
-			char **index = list.rec_list; 
-			while ( *index != NULL) {
-				if (write(fd[1], *index, strlen(*index)) != strlen(*index)) {
+			for(int i = 0; i < list.count; i++) {
+				char *temp = list.rec_list[i];
+				if (write(fd[1], temp, strlen(temp)) != strlen(temp)) {
 					die("write error\n");
 				}
 		
-				printf("parent: %s\n", *index);
-				index++;
+				printf("parent: %s\n", temp);
 			}
 
 		char requestLine[1000];
@@ -204,20 +203,21 @@ void resizeList(char **list, int *count) {
 	temp = temp;
 }
 */
-void addLine(struct headers list, char *line) {
-	list.rec_list[list.count++] = line;
-	list.count++;
+void addLine(struct headers *list, char *line) {
+	list->rec_list[list->count++] = line;
+	//list.count++;
 
-	if (list.count == list.size) {
-		char **temp = realloc(list.rec_list, PTR_SIZE * (list.size * 2));
-		list.rec_list = temp;
-		list.size *= 2;
+	if (list->count == list->size) {
+		printf("resizing list\n");
+		char **temp = realloc(list->rec_list, PTR_SIZE * (list->size * 2));
+		list->rec_list = temp;
+		list->size *= 2;
 	}
 
 
 }
 
-int getSender(struct headers list) {
+int getSender(struct headers *list) {
 	
 	char fromLine[1000];
 	char *sender;
@@ -259,7 +259,7 @@ int getSender(struct headers list) {
 
 }
 
-int getRecvr(struct headers list, int r_count) {
+int getRecvr(struct headers *list, int *r_count) {
 	
 	char requestLine[1000];
 	char *separator = ":";
@@ -277,7 +277,7 @@ int getRecvr(struct headers list, int r_count) {
 	
 	//check if this is the data line.
 	if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
-		if (r_count == 0) {
+		if (*r_count == 0) {
 			fprintf(stderr, "DATA out of place, skipping\n");
 			skipNext();
 			return -1;
@@ -286,11 +286,7 @@ int getRecvr(struct headers list, int r_count) {
 		//printf("Found DATA\n");
 		return -1;
 	}
-/*
-	if (r_count + 1 == list_count) {
-		resizeList(rec_list, &list_count);
-	}
-*/
+	
 	// add to list of recipients
 	method = strtok(requestLine, separator);
 	user = strtok(NULL, separator);
@@ -305,10 +301,7 @@ int getRecvr(struct headers list, int r_count) {
 		printf("passed rcpt to test, sending to : %s\n", user);
 		
 		addLine(list, recvr);
-		
-		//rec_list[r_count] = recvr;
-		r_count++;
-		//trim user name;
+		*r_count = *r_count + 1;
 	}
 
 	return 1;

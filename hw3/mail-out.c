@@ -14,34 +14,50 @@ static void die(const char *message) {
 	exit(1);
 }
 
+struct headers {
+	char **rec_list;
+	int size;
+	int count;
+};
+
 int checkEOF(void); 
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
 int checkMailCount(char *);
-FILE *getTempFile(char **);
+void addLine(struct headers *, char *);
+FILE *getTempFile(struct headers *);
 FILE *getRecvFile(char *);
 char *getMailCountString(char *);
 char *getFromString(char *);
-char *getToString(char **);
-
+char *getToString(struct headers *);
+//int getSender(struct headers *);
+//int getRecvr(struct headers *, int *);
 
 int main(int argc, char **argv) {
 
+	printf("\n*****IM STARTING**********\n");
 	char requestLine[1000];
 	char fromLine[1000];
-	char **rec_list = malloc (5 * sizeof(*rec_list));
 	int list_count = 0;
 	char *sender;
 	int r_count = 0;
 
+	struct headers list;
+	list.rec_list = malloc (5 * sizeof(list.rec_list));
+	list.size = 5;
+	list.count = 0;
+
 
 	//First check mail from 
 	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
-		die("fgets failed\n");	
+		die("child fgets failed\n");	
 	}
 	//sender[strlen(sender) - 1] = '\0';
 
+	printf("I RECEIVED SOMETHING: \n%s\n", fromLine);
+	printf("I'm here now\n");
+	fflush(stdout);
 	char *separator = ":";
 	char *method = "";
 	char *user = "";
@@ -72,10 +88,6 @@ int main(int argc, char **argv) {
 			break;
 		}
 		
-		if (r_count == list_count) {
-			resizeList(rec_list, &list_count);
-		}
-		
 		// add to list of recipients
 		method = strtok(requestLine, separator);
 		user = strtok(NULL, separator);
@@ -93,7 +105,7 @@ int main(int argc, char **argv) {
 		char *recvr = malloc(strlen(user) + 1); 
 		strcpy(recvr, user);
 
-		rec_list[r_count] = recvr;
+		addLine(&list, recvr);
 		r_count++;
 		
 		}
@@ -101,7 +113,7 @@ int main(int argc, char **argv) {
 	//we need to get file count and open the file
 	//for everything else we read in, we write to the file
 	
-	FILE *fp = getTempFile(rec_list);
+	FILE *fp = getTempFile(&list);
 
 	//write to temp file
 	while (1) {
@@ -109,7 +121,7 @@ int main(int argc, char **argv) {
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {    
 			die("fgets failed\n");	
 	}
-		
+		printf("child: %s\n", requestLine);
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 			printf("reached end of data\n");
 			break;	
@@ -120,13 +132,23 @@ int main(int argc, char **argv) {
 
 	// now tmp file has all the messages
 	char *msg_from = getFromString(sender);
-	char *msg_to = getToString(rec_list);
+	char *msg_to = getToString(&list);
 
 	//printf("from: %s\n", msg_from);
 	//printf("to: %s\n", msg_to);
 
-	char **index = rec_list;
-	char *temp;
+	for (int i = 1; i < list.count; i++) {
+		FILE *fp1 = getRecvFile(list.rec_list[i]);
+		//open file using rec_list[i < rec_count]
+		fputs(msg_from, fp1);
+		fputs(msg_to, fp1);
+		//write from and to 
+		//fseek to beginning of temp file, write to mailbox
+		fclose(fp1);
+
+	}
+	
+/*	
 	while ((temp = *index++)) {
 		FILE *fp1 = getRecvFile(temp);
 		//open file using rec_list[i < rec_count]
@@ -136,15 +158,15 @@ int main(int argc, char **argv) {
 		//fseek to beginning of temp file, write to mailbox
 		fclose(fp1);
 	}
-	
-	
-	printf("in reclist: \n");
-	for (int i = 0; i < r_count; i++) {
-		printf("%s\n", rec_list[i]);
-		free(rec_list[i]);
+*/	
+	for (int i = 0; i < list.count; i++) {
+		free(list.rec_list[i]);
+
 	}
 
-	free(rec_list);
+	printf("in reclist: \n");
+
+	free(list.rec_list);
 	free(msg_from);
 	free(msg_to);
 	fclose(fp);
@@ -209,6 +231,17 @@ void skipNext(void) {
 	}
 }
 
+void addLine(struct headers *list, char *line) {
+	list->rec_list[list->count++] = line;
+        //list.count++;	
+	if (list->count == list->size) {
+		printf("resizing list\n");
+		char **temp = realloc(list->rec_list, PTR_SIZE * (list->size * 2));
+		list->rec_list = temp;
+		list->size *= 2;
+	}
+}
+
 void resizeList(char **list, int *count) {
 	char **temp = realloc(list, PTR_SIZE * *count * 2);
 	*count = *count * 2;
@@ -263,8 +296,8 @@ int checkMailCount(char *user) {
 	return count;
 }
 
-FILE *getTempFile(char **rec_list) {
-	char *rec_one = rec_list[0];
+FILE *getTempFile(struct headers *list) {
+	char *rec_one = list->rec_list[0];
 	//printf("pre checkmail %s\n", rec_one);
 
 	//open a tmp file
@@ -373,7 +406,7 @@ char *getFromString(char *sender) {
 	return fromString;
 }
 
-char *getToString(char **list) {
+char *getToString(struct headers *list) {
 	char to[] = "To : ";
 	char next[] = ", ";
 	int size = 0;
@@ -382,21 +415,31 @@ char *getToString(char **list) {
 	char *temp;
 
 	//size += strlen(to);
-	size += strlen(*index++);
+	size += strlen(list->rec_list[1]);
 
+	for (int i = 2; i < list->count; i++) {
+		size += (strlen(next) + strlen(list->rec_list[i]));
+	}
+/*
 	while ((temp = *index++)) {
 		size += (strlen(next) + strlen(temp));
 	}
-
+*/
 	char *toString = malloc(strlen(to) + size + 1);
 	
 	strcpy(toString, to);
-	strcat(toString, *list++);
+	strcat(toString, list->rec_list[1]);
 
+	for (int i = 2; i < list->count; i++) {
+		strcat(toString, next);
+		strcat(toString, list->rec_list[i]);
+	}
+/*
 	while ((temp = *list++)) {
 		strcat(toString, next);
 		strcat(toString, temp);
 	}
+*/
 	toString[strlen(to) + size] = '\0';
 	return toString;
 }
