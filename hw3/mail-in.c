@@ -270,10 +270,8 @@ int getRecvr(struct headers *list, int *r_count) {
 		die("fgets failed\n");	
 	}
 
-	char *recvr = malloc(strlen(requestLine)); 
-	strcpy(recvr, requestLine);
-	//recvr[strlen(requestLine) - 1] = '\0'; //overwrite newline
-	//printf("debug: %s\n", requestLine);
+	char *recvr = malloc(strlen(requestLine)); //mallocs enough space up to \n
+	strcpy(recvr, requestLine); //copies up to \n
 	
 	//check if this is the data line.
 	if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
@@ -290,15 +288,15 @@ int getRecvr(struct headers *list, int *r_count) {
 	// add to list of recipients
 	method = strtok(requestLine, separator);
 	user = strtok(NULL, separator);
-	user[strlen(user) - 1] = 0;
-	user++;
+	//user[strlen(user) - 1] = 0;
+	//user++;
 
 	if (strcasecmp(method, "rcpt to") != 0) {
 		fprintf(stderr, "Error in request, skipping\n");
 		skipNext();
 		return -1;
 	} else {
-		printf("passed rcpt to test, sending to : %s\n", user);
+		//printf("passed rcpt to test, sending to : %s\n", user);
 		
 		addLine(list, recvr);
 		*r_count = *r_count + 1;

@@ -39,7 +39,6 @@ int main(int argc, char **argv) {
 	printf("\n*****IM STARTING**********\n");
 	char requestLine[1000];
 	char fromLine[1000];
-	int list_count = 0;
 	char *sender;
 	int r_count = 0;
 
@@ -56,7 +55,6 @@ int main(int argc, char **argv) {
 	//sender[strlen(sender) - 1] = '\0';
 
 	printf("I RECEIVED SOMETHING: \n%s\n", fromLine);
-	printf("I'm here now\n");
 	fflush(stdout);
 	char *separator = ":";
 	char *method = "";
@@ -67,8 +65,11 @@ int main(int argc, char **argv) {
 
 	//trimming name
 	sender[strlen(sender) - 1] = '\0'; //get rid of new line
-	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
+	sender[strlen(sender) - 1] = '\n'; // get rid of ending >
 	sender++; //get rid of starting <
+	//char *sndr = malloc(strlen(sender));
+	//strcpy(sndr, sender, strlen(sender));
+	//addLine(&list, sndr);
 	//printf("trimmed user: %s\n", sender);
 
 	while (1) {
@@ -102,13 +103,13 @@ int main(int argc, char **argv) {
 			continue;
 		}
 
-		char *recvr = malloc(strlen(user) + 1); 
+		char *recvr = malloc(strlen(user) ); 
 		strcpy(recvr, user);
 
 		addLine(&list, recvr);
 		r_count++;
 		
-		}
+	}
 	//At this point, we have all the sender and receiver data
 	//we need to get file count and open the file
 	//for everything else we read in, we write to the file
@@ -119,7 +120,7 @@ int main(int argc, char **argv) {
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {    
-			die("fgets failed\n");	
+			die("fgets failed\n");	//includes new line
 	}
 		printf("child: %s\n", requestLine);
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
@@ -134,14 +135,17 @@ int main(int argc, char **argv) {
 	char *msg_from = getFromString(sender);
 	char *msg_to = getToString(&list);
 
-	//printf("from: %s\n", msg_from);
-	//printf("to: %s\n", msg_to);
+	printf("from: %s\n", msg_from);
+	printf("to: %s\n", msg_to);
 
-	for (int i = 1; i < list.count; i++) {
+	printf("list count: %d\n", list.count);
+
+	for (int i = 0; i < list.count; i++) {
+		//printf("inside this loop\n");
 		FILE *fp1 = getRecvFile(list.rec_list[i]);
 		//open file using rec_list[i < rec_count]
-		fputs(msg_from, fp1);
-		fputs(msg_to, fp1);
+		fwrite(msg_from, 1, strlen(msg_from), fp1);
+		fwrite(msg_to, 1, strlen(msg_to) , fp1);
 		//write from and to 
 		//fseek to beginning of temp file, write to mailbox
 		fclose(fp1);
@@ -397,27 +401,32 @@ char *getMailCountString(char *user) {
 }
 
 char *getFromString(char *sender) {
-	char from[] = "From : ";
+	printf("Inside from string\n");
+	
+	char from[] = "From: ";
 	char *fromString = malloc(strlen(from) + strlen(sender) + 1);
 	strcpy(fromString, from);
 	strcat(fromString, sender);
 
-	fromString[strlen(sender) + strlen(from)] = '\0'; //null terminate string
+	fromString[strlen(sender) + strlen(from)] = '\0'; //finish with null terminator
 	return fromString;
 }
 
 char *getToString(struct headers *list) {
+	printf("inside to string\n");
+
 	char to[] = "To : ";
 	char next[] = ", ";
 	int size = 0;
 
-	char **index = list;
-	char *temp;
+	//char **index = list->rec_list;
+	//char *temp;
 
 	//size += strlen(to);
-	size += strlen(list->rec_list[1]);
+	size += strlen(list->rec_list[0]);
+	printf("%s\n", list->rec_list[0]);
 
-	for (int i = 2; i < list->count; i++) {
+	for (int i = 1; i < list->count; i++) {
 		size += (strlen(next) + strlen(list->rec_list[i]));
 	}
 /*
@@ -425,12 +434,19 @@ char *getToString(struct headers *list) {
 		size += (strlen(next) + strlen(temp));
 	}
 */
-	char *toString = malloc(strlen(to) + size + 1);
+	printf("Here in to strong\n");
+	printf("size: %d\n", size);
+
+	char *toString = malloc(strlen(to) + size + 2); // make space for new line and null
+	if (toString == NULL)
+		printf("malloc failed\n");
 	
 	strcpy(toString, to);
-	strcat(toString, list->rec_list[1]);
+	strcat(toString, list->rec_list[0]);
 
-	for (int i = 2; i < list->count; i++) {
+
+	printf("here 2 in to string\n");
+	for (int i = 1; i < list->count; i++) {
 		strcat(toString, next);
 		strcat(toString, list->rec_list[i]);
 	}
@@ -440,7 +456,9 @@ char *getToString(struct headers *list) {
 		strcat(toString, temp);
 	}
 */
-	toString[strlen(to) + size] = '\0';
+	toString[strlen(to) + size] = '\n'; //finish with new line
+	toString[strlen(to) + size + 1] = '\0';
+	printf("toString: %s\n", toString);
 	return toString;
 }
 
