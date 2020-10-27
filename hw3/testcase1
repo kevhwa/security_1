@@ -9,3 +9,8 @@ RCPT TO:<necker>
 DATA
 .i
 .
+MAIL FROM:<overrich>
+RCPT TO:<neckar>
+DATA
+.i
+.

@@ -6,7 +6,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-#define BUFF_SIZE 4096
+#define BUFF_SIZE 50
 #define PTR_SIZE 8
 
 static void die(const char *message) {
@@ -31,14 +31,12 @@ FILE *getRecvFile(char *);
 char *getMailCountString(char *);
 char *getFromString(char *);
 char *getToString(struct headers *);
-//int getSender(struct headers *);
-//int getRecvr(struct headers *, int *);
 
 int main(int argc, char **argv) {
 
 	printf("\n*****IM STARTING**********\n");
-	char requestLine[1000];
-	char fromLine[1000];
+	char requestLine[BUFF_SIZE];
+	char fromLine[BUFF_SIZE];
 	char *sender;
 	int r_count = 0;
 
@@ -54,8 +52,8 @@ int main(int argc, char **argv) {
 	}
 	//sender[strlen(sender) - 1] = '\0';
 
-	printf("I RECEIVED SOMETHING: \n%s\n", fromLine);
-	fflush(stdout);
+	//printf("I RECEIVED SOMETHING: \n%s\n", fromLine);
+	//fflush(stdout);
 	char *separator = ":";
 	char *method = "";
 	char *user = "";
@@ -63,21 +61,19 @@ int main(int argc, char **argv) {
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 
-	//trimming name
+	//trimming name just for mailbox comparison
 	sender[strlen(sender) - 1] = '\0'; //get rid of new line
 	sender[strlen(sender) - 1] = '\n'; // get rid of ending >
 	sender++; //get rid of starting <
-	//char *sndr = malloc(strlen(sender));
-	//strcpy(sndr, sender, strlen(sender));
-	//addLine(&list, sndr);
-	//printf("trimmed user: %s\n", sender);
 
+
+	//get receiver info
 	while (1) {
 
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			die("fgets failed\n");	
 		}
-		//printf("debug: %s\n", requestLine);
+		printf("debug: %s\n", requestLine);
 
 		//check if this is the data line.
 		if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
@@ -100,6 +96,7 @@ int main(int argc, char **argv) {
 
 		//check if user is in mailbox. If not continue;
 		if (checkValidUser(user) != 1) {
+			printf("invalid user\n");
 			continue;
 		}
 
@@ -117,17 +114,28 @@ int main(int argc, char **argv) {
 	FILE *fp = getTempFile(&list);
 
 	//write to temp file
+	printf("\nreading from stdin, writing to temp\n");
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {    
 			die("fgets failed\n");	//includes new line
-	}
-		printf("child: %s\n", requestLine);
+		}
+
+		printf("%s", requestLine);
+
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 			printf("reached end of data\n");
+			fputs(requestLine, fp);	
 			break;	
 		} else {
 			fputs(requestLine, fp);	
+			//the buffer was full and last char is null terminated
+			//buffer is not full and there is a /n somewhere
+			
+			//if (requestLine[strlen(requestLine) - 1] == '\n') {
+			//	fputc('\n', fp);
+				
+			//}
 		}
 	}
 
@@ -135,34 +143,46 @@ int main(int argc, char **argv) {
 	char *msg_from = getFromString(sender);
 	char *msg_to = getToString(&list);
 
-	printf("from: %s\n", msg_from);
-	printf("to: %s\n", msg_to);
+	//printf("from: %s\n", msg_from);
+	//printf("to: %s\n", msg_to);
 
-	printf("list count: %d\n", list.count);
-
+	printf("\nReading from tmp, writing to receiver\n");
 	for (int i = 0; i < list.count; i++) {
-		//printf("inside this loop\n");
+		
 		FILE *fp1 = getRecvFile(list.rec_list[i]);
 		//open file using rec_list[i < rec_count]
 		fwrite(msg_from, 1, strlen(msg_from), fp1);
 		fwrite(msg_to, 1, strlen(msg_to) , fp1);
-		//write from and to 
-		//fseek to beginning of temp file, write to mailbox
+		fseek(fp, 0, SEEK_SET);
+
+		while (1) {
+	
+		if (fgets(requestLine, sizeof(requestLine), fp) == NULL) {    
+			die("fgets failed\n");	//includes new line
+		}
+
+		printf("%s", requestLine);
+
+		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
+			printf("reached end of data\n");
+			break;	
+		} else {
+			fputs(requestLine, fp1);	
+			//the buffer was full and last char is null terminated
+			//buffer is not full and there is a /n somewhere
+			if (requestLine[strlen(requestLine) - 1] == '\n') {
+				fputc('\n', fp1);
+				
+			}
+		}
+	}
+	
+
 		fclose(fp1);
 
 	}
 	
-/*	
-	while ((temp = *index++)) {
-		FILE *fp1 = getRecvFile(temp);
-		//open file using rec_list[i < rec_count]
-		fputs(msg_from, fp1);
-		fputs(msg_to, fp1);
-		//write from and to 
-		//fseek to beginning of temp file, write to mailbox
-		fclose(fp1);
-	}
-*/	
+
 	for (int i = 0; i < list.count; i++) {
 		free(list.rec_list[i]);
 
@@ -220,7 +240,7 @@ int checkValidUser(char *user) {
 void skipNext(void) {
 
 	printf("Skipping to next mail\n");
-	char requestLine[1000];
+	char requestLine[BUFF_SIZE];
 
 	while (1) {
 	
@@ -255,7 +275,7 @@ void resizeList(char **list, int *count) {
 
 int checkMailCount(char *user) {
 	
-	printf("\nInside checkMailCount function\n");
+	//printf("\nInside checkMailCount function\n");
 
 	struct dirent *dp;
 	DIR *dfd;
@@ -267,7 +287,7 @@ int checkMailCount(char *user) {
 	//create "test/mail/username"
 	strcpy(dir_name, path);
 	strcat(dir_name, user);
-	printf("path name %s\n", dir_name);
+	//printf("path name %s\n", dir_name);
 
 	//*********** need to change when you move exec to bin******
 	if ((dfd = opendir(dir_name)) == NULL) {
@@ -296,7 +316,7 @@ int checkMailCount(char *user) {
 	if (count >= 99999) {
 		die("too much mail\n");
 	}
-	printf("mail count: %d\n", count);
+	//printf("mail count: %d\n", count);
 	return count;
 }
 
@@ -307,7 +327,7 @@ FILE *getTempFile(struct headers *list) {
 	//open a tmp file
 	char *num = getMailCountString(rec_one);
 
-	printf("prefile\n");
+	//printf("prefile\n");
 	char path[] = "test/tmp/";
 	char filePath[strlen(path) + strlen(rec_one) + strlen(num) + 1];
 	//sprintf(filePath, "%s%s%s", path, rec_one, num);
@@ -332,14 +352,8 @@ FILE *getTempFile(struct headers *list) {
 }
 
 FILE *getRecvFile(char *recver) {
-	printf("\nInside recv file function\n");
-/*
-Move to individual write
-	char path[] = "test/mail/";
-	char filePath[strlen(path) + strlen(user) + strlen(num)];
-	sprintf(filePath, "%s%s%s", path,recipient, num);
-	FILE *fp = fopen(filePath, "w+");
-*/
+	//printf("\nInside recv file function\n");
+	
 	//open a tmp file
 	char *num = getMailCountString(recver);
 
@@ -351,11 +365,7 @@ Move to individual write
 	strcat(filePath, "/");
 	strcat(filePath, num);
 
-	printf("file path: %s\n", filePath);
-	//printf("%s\n", path);
-	//printf("%s\n", rec_one);
-	//printf("%s\n", num);
-	//printf("seg fault?\n");
+	//printf("file path: %s\n", filePath);
 	FILE *fp = fopen(filePath, "w+");
 	
 	if (fp == NULL) {
@@ -401,7 +411,7 @@ char *getMailCountString(char *user) {
 }
 
 char *getFromString(char *sender) {
-	printf("Inside from string\n");
+	//printf("Inside from string\n");
 	
 	char from[] = "From: ";
 	char *fromString = malloc(strlen(from) + strlen(sender) + 1);
@@ -413,9 +423,9 @@ char *getFromString(char *sender) {
 }
 
 char *getToString(struct headers *list) {
-	printf("inside to string\n");
+	//printf("inside to string\n");
 
-	char to[] = "To : ";
+	char to[] = "To: ";
 	char next[] = ", ";
 	int size = 0;
 
@@ -424,18 +434,11 @@ char *getToString(struct headers *list) {
 
 	//size += strlen(to);
 	size += strlen(list->rec_list[0]);
-	printf("%s\n", list->rec_list[0]);
+	//printf("%s\n", list->rec_list[0]);
 
 	for (int i = 1; i < list->count; i++) {
 		size += (strlen(next) + strlen(list->rec_list[i]));
 	}
-/*
-	while ((temp = *index++)) {
-		size += (strlen(next) + strlen(temp));
-	}
-*/
-	printf("Here in to strong\n");
-	printf("size: %d\n", size);
 
 	char *toString = malloc(strlen(to) + size + 2); // make space for new line and null
 	if (toString == NULL)
@@ -445,20 +448,13 @@ char *getToString(struct headers *list) {
 	strcat(toString, list->rec_list[0]);
 
 
-	printf("here 2 in to string\n");
 	for (int i = 1; i < list->count; i++) {
 		strcat(toString, next);
 		strcat(toString, list->rec_list[i]);
 	}
-/*
-	while ((temp = *list++)) {
-		strcat(toString, next);
-		strcat(toString, temp);
-	}
-*/
+	
 	toString[strlen(to) + size] = '\n'; //finish with new line
 	toString[strlen(to) + size + 1] = '\0';
-	printf("toString: %s\n", toString);
 	return toString;
 }
 

@@ -13,7 +13,7 @@ Q
 #include <sys/wait.h>
 
 
-#define BUFF_SIZE 4096
+#define BUFF_SIZE 50
 #define PTR_SIZE 8
 
 static void die(const char *message) {
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
 		//Check if EOF
 		
 		if (checkEOF() == 1) {
-			printf("EOF REACHED\n");
+			//printf("EOF REACHED\n");
 			break;
 		}
 
@@ -87,16 +87,17 @@ int main(int argc, char **argv) {
 				die("write error\n");
 			}
 */			
+			//writing recepient info
 			for(int i = 0; i < list.count; i++) {
 				char *temp = list.rec_list[i];
 				if (write(fd[1], temp, strlen(temp)) != strlen(temp)) {
 					die("write error\n");
 				}
 		
-				printf("parent: %s\n", temp);
+				//printf("parent: %s\n", temp);
 			}
 
-		char requestLine[1000];
+		char requestLine[BUFF_SIZE];
 
 		//read in data 
 		while (1) {
@@ -167,7 +168,7 @@ int checkValidUser(char *user) {
 	{
 		
 		if (strcmp(user, dp->d_name) == 0) {
-			printf("user found\n");
+			//printf("user found\n");
 			return 1;
 		} else {
 			continue;
@@ -181,7 +182,7 @@ int checkValidUser(char *user) {
 void skipNext(void) {
 
 	printf("Skipping to next mail\n");
-	char requestLine[1000];
+	char requestLine[BUFF_SIZE];
 
 	while (1) {
 	
@@ -219,7 +220,7 @@ void addLine(struct headers *list, char *line) {
 
 int getSender(struct headers *list) {
 	
-	char fromLine[1000];
+	char fromLine[BUFF_SIZE];
 	char *sender;
 	char *separator = ":";
 	char *method = "";
@@ -244,7 +245,7 @@ int getSender(struct headers *list) {
 		skipNext();
 		return -1;
 	} else {
-		printf("Passed mail from check, mail from : %s\n", sender);
+		//printf("Passed mail from check, mail from : %s\n", sender);
 		
 		if (checkValidUser(sender) != 1) {
 			printf("Not valid sender\n");
@@ -261,7 +262,7 @@ int getSender(struct headers *list) {
 
 int getRecvr(struct headers *list, int *r_count) {
 	
-	char requestLine[1000];
+	char requestLine[BUFF_SIZE];
 	char *separator = ":";
 	char *method = "";
 	char *user = "";
