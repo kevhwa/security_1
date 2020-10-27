@@ -128,7 +128,14 @@ int main(int argc, char **argv) {
 			fputs(requestLine, fp);	
 			break;	
 		} else {
+			if (strncmp(requestLine, ".", 1) == 0) {
+				char *ptr = requestLine;
+				ptr++;
+				fputs(ptr, fp);
+			} else {
+			
 			fputs(requestLine, fp);	
+			}
 			//the buffer was full and last char is null terminated
 			//buffer is not full and there is a /n somewhere
 			
