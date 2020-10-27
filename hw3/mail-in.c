@@ -260,6 +260,18 @@ int getSender(struct headers *list) {
 
 }
 
+int recvrExists(struct headers *list, char *recvr) {
+
+	for(int i = 1; i < list->count; i++) { //ignoring sender
+		char *temp = list->rec_list[i];
+		printf("trying to match: %s\n", recvr);
+		if (strcmp(temp, recvr) == 0){
+			return 1;
+		}
+	}
+	return 0;
+}
+
 int getRecvr(struct headers *list, int *r_count) {
 	
 	char requestLine[BUFF_SIZE];
@@ -298,9 +310,10 @@ int getRecvr(struct headers *list, int *r_count) {
 		return -1;
 	} else {
 		//printf("passed rcpt to test, sending to : %s\n", user);
-		
-		addLine(list, recvr);
-		*r_count = *r_count + 1;
+		if (!recvrExists(list, recvr)) {
+			addLine(list, recvr);
+			*r_count = *r_count + 1;
+		}
 	}
 
 	return 1;

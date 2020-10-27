@@ -393,13 +393,16 @@ char *getMailCountString(char *user) {
 		if(mailCount/10 > 0) {
 			dig++;
 		}
+		break;
 	}
-	
+	//printf("digits: %d\n", dig);
+
 	char *num = malloc(sizeof(char) * 5 + 1);
 	int zero = 5 - dig;
 	char temp[5];
 	int k = 0;
 	sprintf(temp, "%d", mailCount);
+	//printf("curr num: %s\n", temp);
 
 	for (int i = 0; i < 5; i++) {
 		if (zero > 0) {
