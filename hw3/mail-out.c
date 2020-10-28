@@ -59,7 +59,13 @@ int main(int argc, char **argv) {
 			printf("reached end of data\n");
 			break;	
 		} else {
-			fputs(requestLine, fp1);	
+			if (strncmp(requestLine, ".", 1) == 0) {
+				char *ptr = requestLine;
+				ptr++;
+				fputs(ptr, fp1);
+			} else {
+				fputs(requestLine, fp1);	
+			}
 			//the buffer was full and last char is null terminated
 			//buffer is not full and there is a /n somewhere
 			//if (requestLine[strlen(requestLine) - 1] == '\n') {

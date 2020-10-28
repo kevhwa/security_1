@@ -31,9 +31,11 @@ int checkEOF(void);
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
+void writeTempFile(FILE *, struct headers *list);
 int getSender(struct headers *); 
 int getRecvr(struct headers *, int *);
 int checkMailCount(char *);
+int checkInvalidRecipient(pid_t); 
 FILE *getTempFile(struct headers *);
 char *getMailCountString(char *);
 char *getFromString(struct headers *);
@@ -44,6 +46,8 @@ int main(int argc, char **argv) {
 	struct headers list;
 
 	while(1) {
+		printf("\nnew mail\n");
+		
 		list.rec_list = malloc (5 * sizeof(list.rec_list));
 		list.size = 5;
 		list.count = 0;
@@ -52,7 +56,7 @@ int main(int argc, char **argv) {
 		//Check if EOF
 		
 		if (checkEOF() == 1) {
-			//printf("EOF REACHED\n");
+			printf("EOF REACHED\n");
 			break;
 		}
 
@@ -76,31 +80,9 @@ int main(int argc, char **argv) {
 		//write from and to to temp file
 
 		FILE *temp_fp = getTempFile(&list);
-
-		char *msg_from = getFromString(&list);
-		char *msg_to = getToString(&list);
-
-
-		fwrite(msg_from, 1, strlen(msg_from), temp_fp);
-		fwrite(msg_to, 1, strlen(msg_to), temp_fp);
+		writeTempFile(temp_fp, &list);
 
 		char requestLine[BUFF_SIZE];
-		//read in data and write to tmp
-		while (1) {
-		
-			if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
-				die("fgets failed\n");	
-			}
-			
-			if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-				printf("parent: reached end of data\n");
-				fputs(requestLine, temp_fp);
-				break;	
-			} else {
-				fputs(requestLine, temp_fp);
-			}
-		}
-
 		for(int i = 1; i < list.count; i++) { //ignoring sender
 			fseek(temp_fp, 0, SEEK_SET);
 			char *temp = list.rec_list[i];
@@ -124,7 +106,7 @@ int main(int argc, char **argv) {
 					die("execl failed\n");
 
 			} else{
-				sleep(1);
+				//sleep(1);
 				close(fd[0]);
 
 				while (1) {
@@ -133,7 +115,10 @@ int main(int argc, char **argv) {
 						die("fgets failed\n");	//includes new line
 					}
 
-					printf("%s", requestLine);
+					if (checkInvalidRecipient(pid) < 0)
+						break;
+
+					//printf("%s", requestLine);
 
 					if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 						printf("reached end of data\n");
@@ -150,15 +135,11 @@ int main(int argc, char **argv) {
 					}
 
 				}
-
-			
 			}
-
 
 			close(fd[1]);
 			int status;
 			printf("\nwaiting for child\n");
-
 			if (waitpid(pid, &status, 0) < 0) {
 				die("waitpid failed\n");
 			}
@@ -172,7 +153,6 @@ int main(int argc, char **argv) {
 
 				printf("Exit status was %d\n", es);
 			}
-	
 		}
 
 
@@ -180,8 +160,6 @@ int main(int argc, char **argv) {
 			free(list.rec_list[i]);
 		}
 		free(list.rec_list);
-		
-		
 	}
 }
 
@@ -543,4 +521,54 @@ char *getToString(struct headers *list) {
 	toString[strlen(to) + size] = '\n'; //finish with new line
 	toString[strlen(to) + size + 1] = '\0';
 	return toString;
+}
+
+int checkInvalidRecipient(pid_t pid) {
+
+	int status;
+	int finish;
+	if ((finish = waitpid(pid, &status, WNOHANG)) < 0) {
+		die("waitpid failed\n");
+	}
+
+	if (finish == 0)
+		return 1;
+
+	if (WIFEXITED(status)) {
+	        int es = WEXITSTATUS(status);
+
+		if (es < 0) {
+			fprintf(stderr, "Invalid recipient\n");
+		}
+
+		printf("Exit status was %d\n", es);
+		return -1;
+	}
+
+	return 1;
+}
+
+void writeTempFile(FILE *temp_fp, struct headers *list) {
+	char *msg_from = getFromString(list);
+	char *msg_to = getToString(list);
+
+	fwrite(msg_from, 1, strlen(msg_from), temp_fp);
+	fwrite(msg_to, 1, strlen(msg_to), temp_fp);
+
+	char requestLine[BUFF_SIZE];
+	//read in data and write to tmp
+	while (1) {
+	
+		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+			die("fgets failed\n");	
+		}
+		//printf("debug: %s", requestLine);
+		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
+			//printf("parent: reached end of data\n");
+			fputs(requestLine, temp_fp);
+			break;	
+		} else {
+			fputs(requestLine, temp_fp);
+		}
+	}
 }
