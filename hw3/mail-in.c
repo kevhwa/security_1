@@ -27,7 +27,7 @@ struct headers {
 	int count;
 };
 
-int eof = 1;
+int eof = 0;
 
 int checkEOF(void); 
 int checkValidUser(char *); 
@@ -65,9 +65,15 @@ int main(int argc, char **argv) {
 			break;
 		}
 
+/*		if (feof(stdin)) {
+			printf("End of file reached\n");
+			free(list.rec_list);
+			break;
+		}
+*/
 		if (getSender(&list) < 0) {
 			free_list(&list);
-			if (eof == 1)
+			if (eof)
 				break;
 
 			continue;
@@ -76,10 +82,6 @@ int main(int argc, char **argv) {
 		int flag = 0;
 		while (1) {
 			int x = getRecvr(&list, &r_count);
-			if (eof == 1) {
-				free_list(&list);
-				break;
-			}
 			if (x < 0) {
 				flag = 1;
 				break;
@@ -92,16 +94,19 @@ int main(int argc, char **argv) {
 			free_list(&list);
 			continue;
 		}
-		//write from and to to temp file
-
-		printf("before temp writing\n");
-		FILE *temp_fp = getTempFile(&list);
-		writeTempFile(temp_fp, &list);
-		if (eof == 1) {
+		if (eof) {
 			free_list(&list);
 			break;
 		}
-		printf("after temp writing\n");
+		//write from and to to temp file
+
+		FILE *temp_fp = getTempFile(&list);
+		writeTempFile(temp_fp, &list);
+		if (eof) {
+			free_list(&list);
+			fclose(temp_fp);
+			break;
+		}
 	
 		char requestLine[BUFF_SIZE];
 		for(int i = 1; i < list.count; i++) { //ignoring sender
@@ -157,7 +162,6 @@ int main(int argc, char **argv) {
 
 				}
 			}
-			fclose(temp_fp);
 			close(fd[1]);
 			int status;
 			printf("\nwaiting for child\n");
@@ -175,6 +179,7 @@ int main(int argc, char **argv) {
 				printf("Exit status was %d\n", es);
 			}
 		}
+		fclose(temp_fp);
 		removeTempFile(&list);
 		free_list(&list);
 
@@ -312,7 +317,7 @@ int getSender(struct headers *list) {
 	return 1;
 
 }
-
+/*
 int recvrExists(struct headers *list, char *recvr) {
 
 	for(int i = 1; i < list->count; i++) { //ignoring sender
@@ -324,7 +329,7 @@ int recvrExists(struct headers *list, char *recvr) {
 	}
 	return 0;
 }
-
+*/
 int getRecvr(struct headers *list, int *r_count) {
 	//printf("inside get recvr\n");
 
@@ -335,7 +340,7 @@ int getRecvr(struct headers *list, int *r_count) {
 
 	if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 		if (feof(stdin)) {
-			fprintf(stderr, "Invalid format");
+			fprintf(stderr, "Invalid format\n");
 			eof = 1;
 			return -1;
 		}
@@ -376,15 +381,12 @@ int getRecvr(struct headers *list, int *r_count) {
 
 	printf("recipients %s\n", user);
 
-		//printf("passed rcpt to test, sending to : %s\n", user);
-	if (!recvrExists(list, user)) {
-		char *recvr = malloc(strlen(user) + 1);
-		strcpy(recvr, user);
-		recvr[strlen(user)] = '\0';
-		addLine(list, recvr);
-		*r_count = *r_count + 1;
-	}
-	
+	//printf("passed rcpt to test, sending to : %s\n", user);
+	char *recvr = malloc(strlen(user) + 1);
+	strcpy(recvr, user);
+	recvr[strlen(user)] = '\0';
+	addLine(list, recvr);
+	*r_count = *r_count + 1;
 
 	return 1;
 }
@@ -479,7 +481,7 @@ char *getMailCountString(char *user) {
 
 FILE *getTempFile(struct headers *list) {
 	char *rec_one = list->rec_list[0];
-	printf("pre checkmail %s\n", rec_one);
+	//printf("pre checkmail %s\n", rec_one);
 
 	//open a tmp file
 	//char *num = getMailCountString(rec_one);
