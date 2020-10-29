@@ -6,12 +6,6 @@ Hello World!
 .
 MAIL FROM:<reinsure>
 RCPT TO:<scerne
-RCPT TO:<starshine>
-DATA
-Hello World!
-.
-MAIL FROM:<reinsure>
-RCPT TO:<scerne
 RCPT TO: <starshine>
 DATA
 Hello World!

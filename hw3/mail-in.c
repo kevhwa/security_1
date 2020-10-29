@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
 				close(fd[0]);
 				close(fd[1]);
 			
-				if (execlp("./mail-out", "mail-out", temp, NULL) < 0)
+				if (execlp("./bin/mail-out", "mail-out", temp, NULL) < 0)
 					die("execl failed\n");
 
 			} else{
@@ -208,7 +208,7 @@ int checkValidUser(char *user) {
 	struct dirent *dp;
 	DIR *dfd;
 
-	if ((dfd = opendir("../mail")) == NULL) {
+	if ((dfd = opendir("mail")) == NULL) {
 		die("Can't open mail dir\n");
 	}
 
@@ -308,7 +308,6 @@ int getSender(struct headers *list) {
 		return -1;
 */
 
-
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 	if (sender == NULL) {
@@ -317,12 +316,6 @@ int getSender(struct headers *list) {
 	}
 
 	sender[strlen(sender) - 1] = '\0'; // get rid of new line
-
-	if (strcasecmp(method, "mail from") != 0 ) {
-		fprintf(stderr, "Invalid sender format, skipping\n");
-		skipNext();
-		return -1;
-	}
 
 	if (strlen(sender) > 258) {
 		fprintf(stderr, "Invalid sender format, skipping\n");
@@ -335,7 +328,7 @@ int getSender(struct headers *list) {
 		return -1;
 	}
 
-	if (sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
+	if (strcasecmp(method, "mail from") != 0 || sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
 		fprintf(stderr, "Invalid sender format, skipping\n");
 		skipNext();
 		return -1;
@@ -409,21 +402,11 @@ int getRecvr(struct headers *list, int *r_count) {
 		return 1;
 	}
 
-	if (strcasecmp(method, "rcpt to") != 0 ) { 
+	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<'|| user[strlen(user)- 1] != '>') { 
 		printf("here1\n");
 		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
-		//skipNext();
 		return 1;
 	} 
-
-	
-	if ( user[0] != '<'|| user[strlen(user)- 1] != '>') {
-		printf("here2: %s\n", user);
-		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
-		//skipNext();
-		return 1;
-
-	}
 
 	user[strlen(user) -1] = '\0';
 	user++;
@@ -536,18 +519,15 @@ FILE *getTempFile(struct headers *list) {
 	//char *num = getMailCountString(rec_one);
 
 	//printf("prefile\n");
-	char path[] = "../tmp/";
+	char path[] = "tmp/";
 	char filePath[strlen(path) + strlen(rec_one) + 1];
 	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
 	strcat(filePath, rec_one);
 	//strcat(filePath, num);
 
-        //printf("temp file path: %s\n", filePath);
-         //printf("%s\n", path);
-         //printf("%s\n", rec_one);
-         //printf("%s\n", num);
-         //printf("seg fault?\n");
+        printf("temp file path: %s\n", filePath);
+	
 	FILE *fp = fopen(filePath, "w+");
 
 	if (fp == NULL) {

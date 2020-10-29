@@ -49,3 +49,19 @@ mkdir urushinic
 mkdir vegetocarbonaceous
 mkdir wamara
 mkdir whaledom
+
+cd ../../
+
+cp tester.sh $1/
+
+cp testcase0 $1/inputs/
+cp testcase1 $1/inputs/testcase1
+cp testcase2 $1/inputs/testcase2
+cp testInvalidName $1/inputs/testInvalidName
+cp testInvalidName2 $1/inputs/testInvalidName2
+cp testInvalidName3 $1/inputs/testInvalidName3
+cp testInvalidName4 $1/inputs/testInvalidName4
+cp testLongStr $1/inputs/testLongStr
+cp testMoreRecv $1/inputs/testMoreRecv
+
+

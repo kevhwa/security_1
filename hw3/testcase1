@@ -20,3 +20,10 @@ DATA
 aldskjfldsajf;alkfdsaFAEWRWQRQ$#TRE^%&YEF43TQ$T$QT#Q$TWRGAG$%&*&^(*OIL
 EAWFAW#T#WT$WYW#ywy4y45657$%&$*(*(^%$#@$%^&*(8765
 .
+MAIL FROM:<reinsure>
+RCPT TO:<scerne
+RCPT TO:<starshine>
+DATA
+Hello World!
+.
+
