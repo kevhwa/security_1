@@ -18,4 +18,7 @@ PHONY += clean
 clean:
 	rm -rf $(objects) a.out *.o
 
+install: mail-in mail-out
+	cp mail-in mail-out $(DEST)
+
 .PHONY: $(PHONY)

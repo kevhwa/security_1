@@ -99,7 +99,7 @@ int checkValidUser(char *user) {
 	DIR *dfd;
 
 	//*********** need to change when you move exec to bin******
-	if ((dfd = opendir("test/mail")) == NULL) {
+	if ((dfd = opendir("../mail")) == NULL) {
 		die("Can't open mail dir\n");
 	}
 
@@ -125,7 +125,7 @@ int checkMailCount(char *user) {
 	struct dirent *dp;
 	DIR *dfd;
 	int count = 0;
-	char path[] = "test/mail/";
+	char path[] = "../mail/";
 	char dir_name[strlen(path) + strlen(user) + 1];
 	struct stat st;
 
@@ -207,7 +207,7 @@ FILE *getRecvFile(char *recver) {
 	//open a tmp file
 	char *num = getMailCountString(recver);
 
-	char path[] = "test/mail/";
+	char path[] = "../mail/";
 	char filePath[strlen(path) + strlen(recver) + 1 + strlen(num) + 1];
 	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
