@@ -13,7 +13,7 @@ Q
 #include <sys/wait.h>
 #include <sys/stat.h>
 
-#define BUFF_SIZE 50
+#define BUFF_SIZE 500
 #define PTR_SIZE 8
 
 static void die(const char *message) {
@@ -28,12 +28,15 @@ struct headers {
 };
 
 int eof = 0;
+//size_t maxSize = 1024*1024*1024;
+//size_t currentSize = 0;
 
 int checkEOF(void); 
 int checkValidUser(char *); 
 void skipNext(void);
+void skipUser(void);
 void resizeList(char **, int *);
-void writeTempFile(FILE *, struct headers *);
+int writeTempFile(FILE *, struct headers *);
 void free_list(struct headers *);
 void removeTempFile(struct headers *);
 int getSender(struct headers *); 
@@ -65,12 +68,6 @@ int main(int argc, char **argv) {
 			break;
 		}
 
-/*		if (feof(stdin)) {
-			printf("End of file reached\n");
-			free(list.rec_list);
-			break;
-		}
-*/
 		if (getSender(&list) < 0) {
 			free_list(&list);
 			if (eof)
@@ -107,7 +104,12 @@ int main(int argc, char **argv) {
 			fclose(temp_fp);
 			break;
 		}
-	
+/*		if (res < 0) {
+			free_list(&list);
+			fclose(temp_fp);
+			break;
+		}
+*/	
 		char requestLine[BUFF_SIZE];
 		for(int i = 1; i < list.count; i++) { //ignoring sender
 			fseek(temp_fp, 0, SEEK_SET);
@@ -250,9 +252,31 @@ void skipNext(void) {
 	}
 }
 
+void skipUser(void) {
+
+	printf("Finishing reading long username\n");
+	char requestLine[BUFF_SIZE];
+
+	while (1) {
+	
+		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+			if (feof(stdin)) {
+				fprintf(stderr, "invalid format\n");
+				eof = 1;
+				break;
+			}
+			die("fgets failed\n");	
+		}
+			
+		if (requestLine[strlen(requestLine) - 1] == '\n') {
+			printf("reached end of username \n");
+			return;	
+		}
+	}
+}
+
 void addLine(struct headers *list, char *line) {
 	list->rec_list[list->count++] = line;
-	//list.count++;
 
 	if (list->count == list->size) {
 		printf("resizing list\n");
@@ -260,8 +284,6 @@ void addLine(struct headers *list, char *line) {
 		list->rec_list = temp;
 		list->size *= 2;
 	}
-
-
 }
 
 int getSender(struct headers *list) {
@@ -280,19 +302,41 @@ int getSender(struct headers *list) {
 		}
 		die("fgets failed\n");	
 	}
-	
-	
+
+/*	currentSize += strlen(fromLine);
+	if (currentSize >= maxSize)
+		return -1;
+*/
+
+
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 	if (sender == NULL) {
-		fprintf(stderr, "Invalid format, skipping\n");
+		fprintf(stderr, "Invalid sender format, skipping\n");
 		return -1;
 	}
 
 	sender[strlen(sender) - 1] = '\0'; // get rid of new line
 
-	if (strcasecmp(method, "mail from") != 0 || sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
-		fprintf(stderr, "Error in request, skipping\n");
+	if (strcasecmp(method, "mail from") != 0 ) {
+		fprintf(stderr, "Invalid sender format, skipping\n");
+		skipNext();
+		return -1;
+	}
+
+	if (strlen(sender) > 258) {
+		fprintf(stderr, "Invalid sender format, skipping\n");
+		if (sender[strlen(sender) - 1] == '\n')
+			skipNext();
+		else {
+			skipUser();
+			skipNext();
+		}
+		return -1;
+	}
+
+	if (sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
+		fprintf(stderr, "Invalid sender format, skipping\n");
 		skipNext();
 		return -1;
 	}
@@ -317,19 +361,7 @@ int getSender(struct headers *list) {
 	return 1;
 
 }
-/*
-int recvrExists(struct headers *list, char *recvr) {
 
-	for(int i = 1; i < list->count; i++) { //ignoring sender
-		char *temp = list->rec_list[i];
-		printf("trying to match: %s\n", recvr);
-		if (strcmp(temp, recvr) == 0){
-			return 1;
-		}
-	}
-	return 0;
-}
-*/
 int getRecvr(struct headers *list, int *r_count) {
 	//printf("inside get recvr\n");
 
@@ -347,7 +379,6 @@ int getRecvr(struct headers *list, int *r_count) {
 		
 		die("fgets failed\n");	
 	}
-
 	
 	//check if this is the data line.
 	if (strcasecmp(requestLine, "data\n") == 0 || strcasecmp(requestLine, "data\r\n") == 0)  {
@@ -370,11 +401,29 @@ int getRecvr(struct headers *list, int *r_count) {
 	}
 	user[strlen(user) - 1] = '\0';
 
-	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<'|| user[strlen(user)- 1] != '>') {
+	if (strlen(user) > 258) {
+		fprintf(stderr, "Invalid recipient format, skipping\n");
+		if (user[strlen(user) - 1] != '\n') {
+			skipUser();
+		}
+		return 1;
+	}
+
+	if (strcasecmp(method, "rcpt to") != 0 ) { 
+		printf("here1\n");
 		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
 		//skipNext();
 		return 1;
 	} 
+
+	
+	if ( user[0] != '<'|| user[strlen(user)- 1] != '>') {
+		printf("here2: %s\n", user);
+		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
+		//skipNext();
+		return 1;
+
+	}
 
 	user[strlen(user) -1] = '\0';
 	user++;
@@ -604,7 +653,7 @@ int checkInvalidRecipient(pid_t pid) {
 	return 1;
 }
 
-void writeTempFile(FILE *temp_fp, struct headers *list) {
+int writeTempFile(FILE *temp_fp, struct headers *list) {
 	char *msg_from = getFromString(list);
 	char *msg_to = getToString(list);
 
@@ -623,6 +672,15 @@ void writeTempFile(FILE *temp_fp, struct headers *list) {
 			}
 			die("fgets failed\n");	
 		}
+
+/*		currentSize += strlen(requestLine);
+		if (currentSize >= maxSize) {
+			fprintf(stderr, "File size too large\n");
+			free(msg_from);
+			free(msg_to);
+			return -1;
+		}
+*/
 		//printf("debug: %s", requestLine);
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 			//printf("parent: reached end of data\n");
@@ -635,6 +693,7 @@ void writeTempFile(FILE *temp_fp, struct headers *list) {
 
 	free(msg_from);
 	free(msg_to);
+	return 1;
 }
 
 void free_list(struct headers *list) {
