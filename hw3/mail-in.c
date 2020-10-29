@@ -31,7 +31,8 @@ int checkEOF(void);
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
-void writeTempFile(FILE *, struct headers *list);
+void writeTempFile(FILE *, struct headers *);
+void free_list(struct headers *);
 int getSender(struct headers *); 
 int getRecvr(struct headers *, int *);
 int checkMailCount(char *);
@@ -57,11 +58,14 @@ int main(int argc, char **argv) {
 		
 		if (checkEOF() == 1) {
 			printf("EOF REACHED\n");
+			free(list.rec_list);
 			break;
 		}
 
-		if (getSender(&list) < 0) 
+		if (getSender(&list) < 0) {
+			free_list(&list);
 			continue;
+		}
 
 		int flag = 0;
 		while (1) {
@@ -74,9 +78,10 @@ int main(int argc, char **argv) {
 		}
 		
 		//print something to err?
-		if (flag == 1) 
+		if (flag == 1) {
+			free_list(&list);
 			continue;
-
+		}
 		//write from and to to temp file
 
 		FILE *temp_fp = getTempFile(&list);
@@ -136,7 +141,7 @@ int main(int argc, char **argv) {
 
 				}
 			}
-
+			fclose(temp_fp);
 			close(fd[1]);
 			int status;
 			printf("\nwaiting for child\n");
@@ -154,12 +159,8 @@ int main(int argc, char **argv) {
 				printf("Exit status was %d\n", es);
 			}
 		}
+		free_list(&list);
 
-
-		for (int i = 0; i < list.count; i++) {
-			free(list.rec_list[i]);
-		}
-		free(list.rec_list);
 	}
 }
 
@@ -183,25 +184,23 @@ int checkValidUser(char *user) {
 	struct dirent *dp;
 	DIR *dfd;
 
-	//*********** need to change when you move exec to bin******
-	if ((dfd = opendir("test/mail")) == NULL) {
+	if ((dfd = opendir("../mail")) == NULL) {
 		die("Can't open mail dir\n");
 	}
-
-	//char dir_name[100];
-	//char new_name_qfd[100];
 
 	while ((dp = readdir(dfd)) != NULL)
 	{
 		
 		if (strcmp(user, dp->d_name) == 0) {
 			//printf("user found\n");
+			closedir(dfd);
 			return 1;
 		} else {
 			continue;
 		}
 		
 	}
+	closedir(dfd);
 
 	return 0;
 }
@@ -223,14 +222,7 @@ void skipNext(void) {
 		}
 	}
 }
-/*
-void resizeList(char **list, int *count) {
-	char **temp = realloc(list, PTR_SIZE * *count * 2);
-	*count = *count * 2;
 
-	temp = temp;
-}
-*/
 void addLine(struct headers *list, char *line) {
 	list->rec_list[list->count++] = line;
 	//list.count++;
@@ -260,25 +252,29 @@ int getSender(struct headers *list) {
 	
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
-	
+	if (sender == NULL) {
+		fprintf(stderr, "Invalid format, skipping\n");
+		return -1;
+	}
+
 	sender[strlen(sender) - 1] = '\0'; // get rid of new line
+
+	if (strcasecmp(method, "mail from") != 0 || sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
+		fprintf(stderr, "Error in request, skipping\n");
+		skipNext();
+		return -1;
+	}
+
 	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
 	sender++;
 
 	printf("sender: %s\n", sender);
 
-	if (strcasecmp(method, "mail from") != 0) {
-		fprintf(stderr, "Error in request, skipping\n");
+	if (checkValidUser(sender) != 1) {
+		printf("Not valid sender\n");
 		skipNext();
 		return -1;
-	} else {
-		//printf("Passed mail from check, mail from : %s\n", sender);
-		
-		if (checkValidUser(sender) != 1) {
-			printf("Not valid sender\n");
-			skipNext();
-			return -1;;
-		}
+	
 	}
 
 	char *sendername = malloc(strlen(sender) + 1); 
@@ -330,26 +326,32 @@ int getRecvr(struct headers *list, int *r_count) {
 	// add to list of recipients
 	method = strtok(requestLine, separator);
 	user = strtok(NULL, separator);
+	if (user == NULL) {
+		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
+		return 1;
+	}
 	user[strlen(user) - 1] = '\0';
+
+	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<'|| user[strlen(user)- 1] != '>') {
+		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
+		//skipNext();
+		return 1;
+	} 
+
 	user[strlen(user) -1] = '\0';
 	user++;
 
 	printf("recipients %s\n", user);
 
-	if (strcasecmp(method, "rcpt to") != 0) {
-		fprintf(stderr, "Error in request, skipping\n");
-		skipNext();
-		return -1;
-	} else {
 		//printf("passed rcpt to test, sending to : %s\n", user);
-		if (!recvrExists(list, user)) {
-			char *recvr = malloc(strlen(user) + 1);
-			strcpy(recvr, user);
-			recvr[strlen(user)] = '\0';
-			addLine(list, recvr);
-			*r_count = *r_count + 1;
-		}
+	if (!recvrExists(list, user)) {
+		char *recvr = malloc(strlen(user) + 1);
+		strcpy(recvr, user);
+		recvr[strlen(user)] = '\0';
+		addLine(list, recvr);
+		*r_count = *r_count + 1;
 	}
+	
 
 	return 1;
 }
@@ -361,7 +363,7 @@ int checkMailCount(char *user) {
 	struct dirent *dp;
 	DIR *dfd;
 	int count = 0;
-	char path[] = "test/mail/";
+	char path[] = "../mail/";
 	char dir_name[strlen(path) + strlen(user) + 1];
 	struct stat st;
 
@@ -370,7 +372,6 @@ int checkMailCount(char *user) {
 	strcat(dir_name, user);
 	//printf("path name %s\n", dir_name);
 
-	//*********** need to change when you move exec to bin******
 	if ((dfd = opendir(dir_name)) == NULL) {
 		die("Can't open mail dir in checkMailCount\n");
 	}
@@ -397,7 +398,8 @@ int checkMailCount(char *user) {
 	if (count >= 99999) {
 		die("too much mail\n");
 	}
-	//printf("mail count: %d\n", count);
+	//printf("mail count: %d\n", count);i
+	closedir(dfd);
 	return count;
 }
 
@@ -450,7 +452,7 @@ FILE *getTempFile(struct headers *list) {
 	char *num = getMailCountString(rec_one);
 
 	//printf("prefile\n");
-	char path[] = "test/tmp/";
+	char path[] = "../tmp/";
 	char filePath[strlen(path) + strlen(rec_one) + strlen(num) + 1];
 	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
@@ -571,4 +573,15 @@ void writeTempFile(FILE *temp_fp, struct headers *list) {
 			fputs(requestLine, temp_fp);
 		}
 	}
+
+	free(msg_from);
+	free(msg_to);
+}
+
+void free_list(struct headers *list) {
+	for (int i = 0; i < list->count; i++) {
+		free(list->rec_list[i]);
+	}
+	free(list->rec_list);
+
 }
