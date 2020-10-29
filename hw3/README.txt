@@ -10,6 +10,9 @@ Directions:
 - ./create-tree.sh <NAME> will create the tree directory. It will also place
   the test script and test files into the appropriate place
 
+1. create tree
+2. make install
+
 
 Mail-in summary
 

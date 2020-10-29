@@ -55,13 +55,13 @@ cd ../../
 cp tester.sh $1/
 
 cp testcase0 $1/inputs/
-cp testcase1 $1/inputs/testcase1
-cp testcase2 $1/inputs/testcase2
-cp testInvalidName $1/inputs/testInvalidName
-cp testInvalidName2 $1/inputs/testInvalidName2
-cp testInvalidName3 $1/inputs/testInvalidName3
-cp testInvalidName4 $1/inputs/testInvalidName4
-cp testLongStr $1/inputs/testLongStr
-cp testMoreRecv $1/inputs/testMoreRecv
-
+cp testcase1 $1/inputs/
+cp testcase2 $1/inputs/
+cp testInvalidName1 $1/inputs/
+cp testInvalidName2 $1/inputs/
+cp testInvalidFormat1 $1/inputs/
+cp testInvalidFormat2 $1/inputs/
+cp testLongStr $1/inputs/
+cp testMoreRecv $1/inputs/
+cp longfile.txt $1/inputs/
 

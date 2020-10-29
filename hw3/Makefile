@@ -1,12 +1,6 @@
 CC = gcc
-CFLAGS = -g -Wall #-Werror
-LDFLAGS = -g -lpthread
-
-#TARGETS = mail-in
-#OBJS = mail-in.o
-
-#$(TARGETS):
-#$(OBJS):
+CFLAGS = -g -Wall 
+LDFLAGS = -g 
 
 objects = mail-in mail-out
 all: $(objects)

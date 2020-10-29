@@ -26,12 +26,12 @@ FILE *getRecvFile(char *);
 
 int main(int argc, char **argv) {
 
-	printf("\n*****IM STARTING**********\n");
+	//printf("\n*****IM STARTING**********\n");
 
 	char *reciever = argv[1];
 	if (checkValidUser(reciever) != 1) {
-		printf("invalid user\n");
-		exit(-1);
+		//printf("invalid user\n");
+		exit(128);
 	}
 
 	FILE *fp1 = getRecvFile(reciever);
@@ -42,13 +42,13 @@ int main(int argc, char **argv) {
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			die("fgets failed\n");	
 		}
-		printf("debug: %s", requestLine);
+		//printf("debug: %s", requestLine);
 
 		
 		//open file using rec_list[i < rec_count]
 
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-			printf("reached end of data\n");
+			//printf("reached end of data\n");
 			break;	
 		} else {
 			if (strncmp(requestLine, ".", 1) == 0) {
@@ -99,7 +99,7 @@ int checkValidUser(char *user) {
 	{
 		
 		if (strcmp(user, dp->d_name) == 0) {
-			printf("user found\n");
+			//printf("user found\n");
 			return 1;
 		} else {
 			continue;
@@ -140,7 +140,7 @@ int checkMailCount(char *user) {
 		strcat(filePath, dp->d_name);
 		
 		if(stat(filePath, &st) == -1 ) {
-			printf("Unable to stat file: %s\n",filePath) ;
+			//printf("Unable to stat file: %s\n",filePath) ;
 			continue ;
 		}
 		if (S_ISDIR(st.st_mode)) {

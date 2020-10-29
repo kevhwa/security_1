@@ -1,8 +1,3 @@
-/*
-Q
-- how does mail out check who the recpient is? Does it read the email?
-- can we assume input files will be properly formatted? like each message will end with a period, no typos etc
-*/
 
 #include <stdio.h>
 #include <string.h>
@@ -28,8 +23,6 @@ struct headers {
 };
 
 int eof = 0;
-//size_t maxSize = 1024*1024*1024;
-//size_t currentSize = 0;
 
 int checkEOF(void); 
 int checkValidUser(char *); 
@@ -53,9 +46,11 @@ int main(int argc, char **argv) {
 	struct headers list;
 
 	while(1) {
-		printf("\nnew mail\n");
+		//printf("\nnew mail\n");
 		
 		list.rec_list = malloc (5 * sizeof(list.rec_list));
+		if (list.rec_list == NULL)
+			die("malloc failed\n");
 		list.size = 5;
 		list.count = 0;
 		int r_count = 0;
@@ -63,7 +58,7 @@ int main(int argc, char **argv) {
 		//Check if EOF
 		
 		if (checkEOF() == 1) {
-			printf("EOF REACHED\n");
+			//printf("EOF REACHED\n");
 			free(list.rec_list);
 			break;
 		}
@@ -149,7 +144,7 @@ int main(int argc, char **argv) {
 					//printf("%s", requestLine);
 
 					if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-						printf("reached end of data\n");
+						//printf("reached end of data\n");
 						write(fd[1], requestLine, strlen(requestLine));
 						break;	
 					} else {
@@ -166,7 +161,7 @@ int main(int argc, char **argv) {
 			}
 			close(fd[1]);
 			int status;
-			printf("\nwaiting for child\n");
+			//printf("\nwaiting for child\n");
 			if (waitpid(pid, &status, 0) < 0) {
 				die("waitpid failed\n");
 			}
@@ -174,11 +169,11 @@ int main(int argc, char **argv) {
 			if (WIFEXITED(status)) {
 			        int es = WEXITSTATUS(status);
 
-				if (es < 0) {
-					fprintf(stderr, "Invalid recipient\n");
+				if (es == 128) {
+					fprintf(stderr, "Error from child: Invalid recipient\n");
 				}
 
-				printf("Exit status was %d\n", es);
+				//printf("Exit status was %d\n", es);
 			}
 		}
 		fclose(temp_fp);
@@ -231,14 +226,14 @@ int checkValidUser(char *user) {
 
 void skipNext(void) {
 
-	printf("Skipping to next mail\n");
+	//printf("Skipping to next mail\n");
 	char requestLine[BUFF_SIZE];
 
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			if (feof(stdin)) {
-				fprintf(stderr, "invalid format\n");
+				fprintf(stderr, "Invalid message format\n");
 				eof = 1;
 				break;
 			}
@@ -246,7 +241,7 @@ void skipNext(void) {
 		}
 			
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-			printf("reached end of data\n");
+			//printf("reached end of data\n");
 			return;	
 		}
 	}
@@ -254,14 +249,14 @@ void skipNext(void) {
 
 void skipUser(void) {
 
-	printf("Finishing reading long username\n");
+	//printf("Finishing reading long username\n");
 	char requestLine[BUFF_SIZE];
 
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			if (feof(stdin)) {
-				fprintf(stderr, "invalid format\n");
+				fprintf(stderr, "Invalid message format\n");
 				eof = 1;
 				break;
 			}
@@ -269,7 +264,7 @@ void skipUser(void) {
 		}
 			
 		if (requestLine[strlen(requestLine) - 1] == '\n') {
-			printf("reached end of username \n");
+			//printf("reached end of username \n");
 			return;	
 		}
 	}
@@ -279,7 +274,7 @@ void addLine(struct headers *list, char *line) {
 	list->rec_list[list->count++] = line;
 
 	if (list->count == list->size) {
-		printf("resizing list\n");
+		//printf("resizing list\n");
 		char **temp = realloc(list->rec_list, PTR_SIZE * (list->size * 2));
 		list->rec_list = temp;
 		list->size *= 2;
@@ -296,7 +291,7 @@ int getSender(struct headers *list) {
 	//First check mail from 
 	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
 		if (feof(stdin)) {
-			fprintf(stderr, "Invalid format, skipping\n");
+			fprintf(stderr, "Invalid format, skipping mail\n");
 			eof = 1;
 			return -1;
 		}
@@ -311,14 +306,14 @@ int getSender(struct headers *list) {
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 	if (sender == NULL) {
-		fprintf(stderr, "Invalid sender format, skipping\n");
+		fprintf(stderr, "Invalid sender format, skipping mail\n");
 		return -1;
 	}
 
 	sender[strlen(sender) - 1] = '\0'; // get rid of new line
 
 	if (strlen(sender) > 258) {
-		fprintf(stderr, "Invalid sender format, skipping\n");
+		fprintf(stderr, "Invalid sender format, skipping mail\n");
 		if (sender[strlen(sender) - 1] == '\n')
 			skipNext();
 		else {
@@ -329,7 +324,7 @@ int getSender(struct headers *list) {
 	}
 
 	if (strcasecmp(method, "mail from") != 0 || sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
-		fprintf(stderr, "Invalid sender format, skipping\n");
+		fprintf(stderr, "Invalid sender format, skipping mail\n");
 		skipNext();
 		return -1;
 	}
@@ -337,16 +332,18 @@ int getSender(struct headers *list) {
 	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
 	sender++;
 
-	printf("sender: %s\n", sender);
+	//printf("sender: %s\n", sender);
 
 	if (checkValidUser(sender) != 1) {
-		printf("Not valid sender\n");
+		//printf("Not valid sender\n");
 		skipNext();
 		return -1;
 	
 	}
 
 	char *sendername = malloc(strlen(sender) + 1); 
+	if (sendername == NULL)
+		die("malloc failed\n");
 	strcpy(sendername, sender);
 	sendername[strlen(sender)] = '\0';
 
@@ -365,7 +362,7 @@ int getRecvr(struct headers *list, int *r_count) {
 
 	if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 		if (feof(stdin)) {
-			fprintf(stderr, "Invalid format\n");
+			fprintf(stderr, "Invalid mail format\n");
 			eof = 1;
 			return -1;
 		}
@@ -395,7 +392,7 @@ int getRecvr(struct headers *list, int *r_count) {
 	user[strlen(user) - 1] = '\0';
 
 	if (strlen(user) > 258) {
-		fprintf(stderr, "Invalid recipient format, skipping\n");
+		fprintf(stderr, "Invalid recipient format, skipping recipient\n");
 		if (user[strlen(user) - 1] != '\n') {
 			skipUser();
 		}
@@ -403,7 +400,7 @@ int getRecvr(struct headers *list, int *r_count) {
 	}
 
 	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<'|| user[strlen(user)- 1] != '>') { 
-		printf("here1\n");
+		//printf("here1\n");
 		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
 		return 1;
 	} 
@@ -411,10 +408,12 @@ int getRecvr(struct headers *list, int *r_count) {
 	user[strlen(user) -1] = '\0';
 	user++;
 
-	printf("recipients %s\n", user);
+	//printf("recipients %s\n", user);
 
 	//printf("passed rcpt to test, sending to : %s\n", user);
 	char *recvr = malloc(strlen(user) + 1);
+	if (recvr == NULL)
+		die("malloc failed\n");
 	strcpy(recvr, user);
 	recvr[strlen(user)] = '\0';
 	addLine(list, recvr);
@@ -452,7 +451,7 @@ int checkMailCount(char *user) {
 		strcat(filePath, dp->d_name);
 		
 		if(stat(filePath, &st) == -1 ) {
-			printf("Unable to stat file: %s\n",filePath) ;
+			//printf("Unable to stat file: %s\n",filePath) ;
 			continue ;
 		}
 		if (S_ISDIR(st.st_mode)) {
@@ -486,6 +485,8 @@ char *getMailCountString(char *user) {
 	//printf("digits: %d\n", dig);
 
 	char *num = malloc(sizeof(char) * 5 + 1);
+	if (num == NULL)
+		die("malloc failed\n");
 	int zero = 5 - dig;
 	char temp[5];
 	int k = 0;
@@ -526,7 +527,7 @@ FILE *getTempFile(struct headers *list) {
 	strcat(filePath, rec_one);
 	//strcat(filePath, num);
 
-        printf("temp file path: %s\n", filePath);
+        //printf("temp file path: %s\n", filePath);
 	
 	FILE *fp = fopen(filePath, "w+");
 
@@ -591,9 +592,9 @@ char *getToString(struct headers *list) {
 	}
 
 	char *toString = malloc(strlen(to) + size + 2); // make space for new line and null
-	if (toString == NULL)
-		printf("malloc failed\n");
-
+	if (toString == NULL) {
+		die("malloc failed\n");
+	}
 	strcpy(toString, to);
 	strcat(toString, list->rec_list[1]);
 
@@ -626,7 +627,7 @@ int checkInvalidRecipient(pid_t pid) {
 			fprintf(stderr, "Invalid recipient\n");
 		}
 
-		printf("Exit status was %d\n", es);
+		//printf("Exit status was %d\n", es);
 		return -1;
 	}
 
@@ -681,5 +682,4 @@ void free_list(struct headers *list) {
 		free(list->rec_list[i]);
 	}
 	free(list->rec_list);
-
 }
