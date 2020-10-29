@@ -27,12 +27,15 @@ struct headers {
 	int count;
 };
 
+int eof = 1;
+
 int checkEOF(void); 
 int checkValidUser(char *); 
 void skipNext(void);
 void resizeList(char **, int *);
 void writeTempFile(FILE *, struct headers *);
 void free_list(struct headers *);
+void removeTempFile(struct headers *);
 int getSender(struct headers *); 
 int getRecvr(struct headers *, int *);
 int checkMailCount(char *);
@@ -64,12 +67,19 @@ int main(int argc, char **argv) {
 
 		if (getSender(&list) < 0) {
 			free_list(&list);
+			if (eof == 1)
+				break;
+
 			continue;
 		}
 
 		int flag = 0;
 		while (1) {
 			int x = getRecvr(&list, &r_count);
+			if (eof == 1) {
+				free_list(&list);
+				break;
+			}
 			if (x < 0) {
 				flag = 1;
 				break;
@@ -84,9 +94,15 @@ int main(int argc, char **argv) {
 		}
 		//write from and to to temp file
 
+		printf("before temp writing\n");
 		FILE *temp_fp = getTempFile(&list);
 		writeTempFile(temp_fp, &list);
-
+		if (eof == 1) {
+			free_list(&list);
+			break;
+		}
+		printf("after temp writing\n");
+	
 		char requestLine[BUFF_SIZE];
 		for(int i = 1; i < list.count; i++) { //ignoring sender
 			fseek(temp_fp, 0, SEEK_SET);
@@ -159,6 +175,7 @@ int main(int argc, char **argv) {
 				printf("Exit status was %d\n", es);
 			}
 		}
+		removeTempFile(&list);
 		free_list(&list);
 
 	}
@@ -213,6 +230,11 @@ void skipNext(void) {
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+			if (feof(stdin)) {
+				fprintf(stderr, "invalid format\n");
+				eof = 1;
+				break;
+			}
 			die("fgets failed\n");	
 		}
 			
@@ -246,6 +268,11 @@ int getSender(struct headers *list) {
 
 	//First check mail from 
 	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
+		if (feof(stdin)) {
+			fprintf(stderr, "Invalid format, skipping\n");
+			eof = 1;
+			return -1;
+		}
 		die("fgets failed\n");	
 	}
 	
@@ -307,6 +334,12 @@ int getRecvr(struct headers *list, int *r_count) {
 	char *user = "";
 
 	if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+		if (feof(stdin)) {
+			fprintf(stderr, "Invalid format");
+			eof = 1;
+			return -1;
+		}
+		
 		die("fgets failed\n");	
 	}
 
@@ -446,18 +479,18 @@ char *getMailCountString(char *user) {
 
 FILE *getTempFile(struct headers *list) {
 	char *rec_one = list->rec_list[0];
-	//printf("pre checkmail %s\n", rec_one);
+	printf("pre checkmail %s\n", rec_one);
 
 	//open a tmp file
-	char *num = getMailCountString(rec_one);
+	//char *num = getMailCountString(rec_one);
 
 	//printf("prefile\n");
 	char path[] = "../tmp/";
-	char filePath[strlen(path) + strlen(rec_one) + strlen(num) + 1];
+	char filePath[strlen(path) + strlen(rec_one) + 1];
 	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
 	strcat(filePath, rec_one);
-	strcat(filePath, num);
+	//strcat(filePath, num);
 
         //printf("temp file path: %s\n", filePath);
          //printf("%s\n", path);
@@ -470,8 +503,27 @@ FILE *getTempFile(struct headers *list) {
 		die("fopen failed");
 	}
 
-	free(num);
+	//free(num);
 	return fp;
+
+}
+
+void removeTempFile (struct headers *list) {
+	char *rec_one = list->rec_list[0];
+	//printf("pre checkmail %s\n", rec_one);
+
+	//open a tmp file
+	//char *num = getMailCountString(rec_one);
+
+	//printf("prefile\n");
+	char path[] = "../tmp/";
+	char filePath[strlen(path) + strlen(rec_one) + 1];
+	//sprintf(filePath, "%s%s%s", path, rec_one, num);
+	strcpy(filePath, path);
+	strcat(filePath, rec_one);
+	//strcat(filePath, num);
+
+	remove(filePath);
 
 }
 
@@ -562,6 +614,11 @@ void writeTempFile(FILE *temp_fp, struct headers *list) {
 	while (1) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+			if (feof(stdin)) {
+				fprintf(stderr, "Invalid format\n");
+				eof = 1;
+				break;
+			}
 			die("fgets failed\n");	
 		}
 		//printf("debug: %s", requestLine);
