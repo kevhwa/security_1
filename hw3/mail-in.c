@@ -581,22 +581,15 @@ char *getMailCountString(char *user) {
 }
 
 
-
-
 FILE *getTempFile(struct headers *list) {
 	char *rec_one = list->rec_list[0];
 	//printf("pre checkmail %s\n", rec_one);
 
-	//open a tmp file
-	//char *num = getMailCountString(rec_one);
-
 	//printf("prefile\n");
 	char path[] = "tmp/";
 	char filePath[strlen(path) + strlen(rec_one) + 1];
-	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
 	strcat(filePath, rec_one);
-	//strcat(filePath, num);
 
         //printf("temp file path: %s\n", filePath);
 	
@@ -608,26 +601,20 @@ FILE *getTempFile(struct headers *list) {
 
 	//free(num);
 	return fp;
-
 }
 
 void removeTempFile (struct headers *list) {
 	char *rec_one = list->rec_list[0];
 	//printf("pre checkmail %s\n", rec_one);
 
-	//open a tmp file
-	//char *num = getMailCountString(rec_one);
-
 	//printf("prefile\n");
-	char path[] = "../tmp/";
+	char path[] = "tmp/";
 	char filePath[strlen(path) + strlen(rec_one) + 1];
-	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
 	strcat(filePath, rec_one);
-	//strcat(filePath, num);
 
 	remove(filePath);
-
+	//fprintf(stderr, "error: %d\n", res);
 }
 
 char *getFromString(struct headers *list) {

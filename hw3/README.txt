@@ -10,9 +10,13 @@ Directions:
 - ./create-tree.sh <NAME> will create the tree directory. It will also place
   the test script and test files into the appropriate place
 
-1. create tree
-2. make install
+1. ./create-tree.sh <name>
+2. make install DEST=<name/bin>
+3. Go into <name> directory
+4. Run ./tester.sh
 
+- Running tests individually messes up the relative paths so it must be run
+  from <name> directory
 
 Mail-in summary
 
