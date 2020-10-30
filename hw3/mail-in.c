@@ -233,14 +233,14 @@ void skipNext(void) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			if (feof(stdin)) {
-				fprintf(stderr, "Invalid message format\n");
+				fprintf(stderr, "Invalid message termination\n");
 				eof = 1;
 				break;
 			}
 			die("fgets failed\n");	
 		}
 			
-		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
+		if (strcmp(requestLine, ".\n" ) == 0 ) {
 			//printf("reached end of data\n");
 			return;	
 		}
@@ -256,7 +256,7 @@ void skipUser(void) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			if (feof(stdin)) {
-				fprintf(stderr, "Invalid message format\n");
+				fprintf(stderr, "Invalid message termination\n");
 				eof = 1;
 				break;
 			}
@@ -291,7 +291,7 @@ int getSender(struct headers *list) {
 	//First check mail from 
 	if (fgets(fromLine, sizeof(fromLine), stdin) == NULL) {
 		if (feof(stdin)) {
-			fprintf(stderr, "Invalid format, skipping mail\n");
+			fprintf(stderr, "Invalid message termination\n");
 			eof = 1;
 			return -1;
 		}
@@ -306,7 +306,8 @@ int getSender(struct headers *list) {
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 	if (sender == NULL) {
-		fprintf(stderr, "Invalid sender format, skipping mail\n");
+		fprintf(stderr, "Invalid blank line, skipping mail\n");
+		skipNext();
 		return -1;
 	}
 
@@ -362,7 +363,7 @@ int getRecvr(struct headers *list, int *r_count) {
 
 	if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 		if (feof(stdin)) {
-			fprintf(stderr, "Invalid mail format\n");
+			fprintf(stderr, "Invalid message termination\n");
 			eof = 1;
 			return -1;
 		}
@@ -386,7 +387,7 @@ int getRecvr(struct headers *list, int *r_count) {
 	method = strtok(requestLine, separator);
 	user = strtok(NULL, separator);
 	if (user == NULL) {
-		fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+		fprintf(stderr, "Invalid blank line, skipping mail\n");
 		skipNext();
 		return -1;
 	}
@@ -404,7 +405,7 @@ int getRecvr(struct headers *list, int *r_count) {
 		//printf("here1\n");
 		fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
 		skipNext();
-		return 1;
+		return -1;
 	} 
 
 	user[strlen(user) -1] = '\0';
@@ -649,7 +650,7 @@ int writeTempFile(FILE *temp_fp, struct headers *list) {
 	
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
 			if (feof(stdin)) {
-				fprintf(stderr, "Invalid format\n");
+				fprintf(stderr, "Invalid message termination\n");
 				eof = 1;
 				break;
 			}

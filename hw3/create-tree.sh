@@ -59,8 +59,12 @@ cp testcase1 $1/inputs/
 cp testcase2 $1/inputs/
 cp testInvalidName1 $1/inputs/
 cp testInvalidName2 $1/inputs/
+cp testInvalidName3 $1/inputs/
 cp testInvalidFormat1 $1/inputs/
 cp testInvalidFormat2 $1/inputs/
+cp testInvalidFormat3 $1/inputs/
+cp testInvalidFormat4 $1/inputs/
+cp testInvalidFormat5 $1/inputs/
 cp testLongStr $1/inputs/
 cp testMoreRecv $1/inputs/
 cp longfile.txt $1/inputs/

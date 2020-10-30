@@ -1,6 +1,7 @@
 MAIL FROM:<reinsure>
-RCPT TO:<scerne>
-
+RCPT TO:<scerne
+RCPT TO:<starshine>
 DATA
 Hello World!
 .
+

@@ -1,6 +1,11 @@
 MAIL FROM:<reinsure>
-RCPT TO:<scerne>
-
+RCPT TO:<durwaun>
 DATA
 Hello World!
 .
+
+
+
+
+
+

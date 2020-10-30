@@ -49,3 +49,9 @@ Specific behaviors
   - I also only read in 500 bytes at a time so there shouldn't be any stack
     memory space issues
 
+- MAIL FROM:<name> , RCPT TO:<name>
+  - Any issues with this header, whether it be invalid username, misspelled 'maile
+    from' or missing < >, all leads to skipping to the next message
+- Any order mixups, MAIL FROM, MAIL FROM will also lead to skipping to the
+  next message
+
