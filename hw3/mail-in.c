@@ -26,6 +26,8 @@ int eof = 0;
 
 int checkEOF(void); 
 int checkValidUser(char *); 
+int recvrExists(struct headers *, char *);
+int verifyUserFormat(void);
 void skipNext(void);
 void skipUser(void);
 void resizeList(char **, int *);
@@ -270,6 +272,31 @@ void skipUser(void) {
 	}
 }
 
+int verifyUserFormat(void) {
+
+	//printf("Finishing reading long username\n");
+	char requestLine[BUFF_SIZE];
+
+	while (1) {
+	
+		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
+			if (feof(stdin)) {
+				fprintf(stderr, "Invalid message termination\n");
+				eof = 1;
+				return -1;
+			}
+			die("fgets failed\n");	
+		}
+			
+		if (requestLine[strlen(requestLine) - 1] == '\n') {
+			if( requestLine[strlen(requestLine) - 2] == '>')
+				return 1;
+			return -1;
+		}
+	}
+	return -1;
+}
+
 void addLine(struct headers *list, char *line) {
 	list->rec_list[list->count++] = line;
 
@@ -279,6 +306,17 @@ void addLine(struct headers *list, char *line) {
 		list->rec_list = temp;
 		list->size *= 2;
 	}
+}
+
+int recvrExists(struct headers *list, char *recvr) {
+
+	for(int i = 1; i < list->count; i++) { //ignoring sender
+		char *temp = list->rec_list[i];
+		if (strcmp(temp, recvr) == 0){
+			return 1;
+		}
+	}
+	return 0;
 }
 
 int getSender(struct headers *list) {
@@ -298,11 +336,6 @@ int getSender(struct headers *list) {
 		die("fgets failed\n");	
 	}
 
-/*	currentSize += strlen(fromLine);
-	if (currentSize >= maxSize)
-		return -1;
-*/
-
 	method = strtok(fromLine, separator);
 	sender = strtok(NULL, separator);
 	if (sender == NULL) {
@@ -311,18 +344,33 @@ int getSender(struct headers *list) {
 		return -1;
 	}
 
-	sender[strlen(sender) - 1] = '\0'; // get rid of new line
-
 	if (strlen(sender) > 258) {
-		fprintf(stderr, "Invalid sender format, skipping mail\n");
-		if (sender[strlen(sender) - 1] == '\n')
-			skipNext();
-		else {
-			skipUser();
-			skipNext();
+		if (sender[strlen(sender) - 1] != '\n') { //means more to read
+			int res = verifyUserFormat();
+			if (res == 1) {
+				fprintf(stderr, "Sender name too long, skipping mail\n");
+				skipNext();
+				return -1;
+			} else if (res < 0) {
+				fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+				skipNext();
+				return -1;
+			}
 		}
+
+		// we read the whole username
+		if (sender[strlen(sender) - 2] != '>') {
+			fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+			skipNext();
+			return -1;
+		}
+		
+		fprintf(stderr, "Sender name too long, skipping mail\n");
+		skipNext();
 		return -1;
 	}
+
+	sender[strlen(sender) - 1] = '\0'; // get rid of new line
 
 	if (strcasecmp(method, "mail from") != 0 || sender[0] != '<' || sender[strlen(sender) - 1] != '>') {
 		fprintf(stderr, "Invalid sender format, skipping mail\n");
@@ -336,10 +384,8 @@ int getSender(struct headers *list) {
 	//printf("sender: %s\n", sender);
 
 	if (checkValidUser(sender) != 1) {
-		//printf("Not valid sender\n");
 		skipNext();
 		return -1;
-	
 	}
 
 	char *sendername = malloc(strlen(sender) + 1); 
@@ -391,15 +437,33 @@ int getRecvr(struct headers *list, int *r_count) {
 		skipNext();
 		return -1;
 	}
-	user[strlen(user) - 1] = '\0';
 
 	if (strlen(user) > 258) {
-		fprintf(stderr, "Invalid recipient format, skipping recipient\n");
-		if (user[strlen(user) - 1] != '\n') {
-			skipUser();
+		if (user[strlen(user) - 1] != '\n') { //means more to read
+			int res = verifyUserFormat();
+			if (res == 1) {
+				fprintf(stderr, "Recipient name too long, skipping recipient\n");
+				return 1;
+			} else if (res < 0) {
+				fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+				skipNext();
+				return -1;
+			}
 		}
+
+		// we read the whole username
+		if (user[strlen(user) - 2] != '>') {
+			fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+			skipNext();
+			return -1;
+		}
+		
+		fprintf(stderr, "Recipient name too long, skipping recipient\n");
 		return 1;
 	}
+
+	user[strlen(user) - 1] = '\0';
+
 
 	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<' || user[strlen(user)- 1] != '>') { 
 		//printf("here1\n");
@@ -419,9 +483,14 @@ int getRecvr(struct headers *list, int *r_count) {
 		die("malloc failed\n");
 	strcpy(recvr, user);
 	recvr[strlen(user)] = '\0';
-	addLine(list, recvr);
-	*r_count = *r_count + 1;
+	
+	if (!recvrExists(list, recvr)){
+		addLine(list, recvr);
+		*r_count = *r_count + 1;
+		return 1;
+	} 
 
+	fprintf(stderr, "Duplicate reciever, skipping receiver\n");
 	return 1;
 }
 

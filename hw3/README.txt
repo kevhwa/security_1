@@ -55,3 +55,9 @@ Specific behaviors
 - Any order mixups, MAIL FROM, MAIL FROM will also lead to skipping to the
   next message
 
+- If sender name is too long, skip the mail
+- If recipient name is too long, skip just that recipient (only if its
+  formatted properly. If not, skip mail). Doing this in regards to
+  professors recent piazza post where he says mail-in can skip usernames
+  that are too long. 
+

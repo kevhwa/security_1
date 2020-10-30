@@ -3,7 +3,7 @@
 for i in inputs/*
 
 do
-        echo "testing: $i"
+        echo "***testing: $i***"
         bin/mail-in <$i
         echo " "
 done
