@@ -32,6 +32,7 @@ void resizeList(char **, int *);
 int writeTempFile(FILE *, struct headers *);
 void free_list(struct headers *);
 void removeTempFile(struct headers *);
+void addBlankLine(struct headers *);
 int getSender(struct headers *); 
 int getRecvr(struct headers *, int *);
 int checkMailCount(char *);
@@ -80,8 +81,6 @@ int main(int argc, char **argv) {
 			} else if (x == 0)
 				break;
 		}
-		
-		//print something to err?
 		if (flag == 1) {
 			free_list(&list);
 			continue;
@@ -90,6 +89,7 @@ int main(int argc, char **argv) {
 			free_list(&list);
 			break;
 		}
+		
 		//write from and to to temp file
 
 		FILE *temp_fp = getTempFile(&list);
@@ -381,13 +381,14 @@ int getRecvr(struct headers *list, int *r_count) {
 		//printf("Found DATA\n");
 		return 0;
 	}
-	
+
 	// add to list of recipients
 	method = strtok(requestLine, separator);
 	user = strtok(NULL, separator);
 	if (user == NULL) {
-		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
-		return 1;
+		fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+		skipNext();
+		return -1;
 	}
 	user[strlen(user) - 1] = '\0';
 
@@ -399,9 +400,10 @@ int getRecvr(struct headers *list, int *r_count) {
 		return 1;
 	}
 
-	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<'|| user[strlen(user)- 1] != '>') { 
+	if (strcasecmp(method, "rcpt to") != 0 || user[0] != '<' || user[strlen(user)- 1] != '>') { 
 		//printf("here1\n");
-		fprintf(stderr, "Invalid RCPT to format, skipping recipient\n");
+		fprintf(stderr, "Invalid RCPT to format, skipping mail\n");
+		skipNext();
 		return 1;
 	} 
 
@@ -491,7 +493,6 @@ char *getMailCountString(char *user) {
 	char temp[5];
 	int k = 0;
 	sprintf(temp, "%d", mailCount);
-	//printf("curr num: %s\n", temp);
 
 	for (int i = 0; i < 5; i++) {
 		if (zero > 0) {
@@ -640,6 +641,7 @@ int writeTempFile(FILE *temp_fp, struct headers *list) {
 
 	fwrite(msg_from, 1, strlen(msg_from), temp_fp);
 	fwrite(msg_to, 1, strlen(msg_to), temp_fp);
+	fputs("\n", temp_fp);
 
 	char requestLine[BUFF_SIZE];
 	//read in data and write to tmp
@@ -654,14 +656,6 @@ int writeTempFile(FILE *temp_fp, struct headers *list) {
 			die("fgets failed\n");	
 		}
 
-/*		currentSize += strlen(requestLine);
-		if (currentSize >= maxSize) {
-			fprintf(stderr, "File size too large\n");
-			free(msg_from);
-			free(msg_to);
-			return -1;
-		}
-*/
 		//printf("debug: %s", requestLine);
 		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
 			//printf("parent: reached end of data\n");
@@ -671,10 +665,15 @@ int writeTempFile(FILE *temp_fp, struct headers *list) {
 			fputs(requestLine, temp_fp);
 		}
 	}
-
+	
 	free(msg_from);
 	free(msg_to);
 	return 1;
+}
+
+void addBlankLine(struct headers *list) {
+	char blank[] = "\n";
+	addLine(list, blank);
 }
 
 void free_list(struct headers *list) {
