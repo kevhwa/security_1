@@ -1,0 +1,5 @@
+MAIL FROM:<reinsure>
+MAIL FROM:<scerne>
+DATA
+Hello World!
+.
