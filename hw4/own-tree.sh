@@ -52,4 +52,4 @@ chown root mail-in
 chown root mail-out
 chmod u+s mail-in
 chmod u+s mail-out
-
+chmod 700 mail-out
