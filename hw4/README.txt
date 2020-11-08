@@ -1,5 +1,5 @@
 Uni: jch2169
-Hw: hw3
+Hw: hw4
 
 
 Directions: 
@@ -8,12 +8,16 @@ Directions:
 - make install DEST=($DEST) will copy the executables into the provided path
 
 - ./create-tree.sh <NAME> will create the tree directory. It will also place
-  the test script and test files into the appropriate place
+  the test script and test files into the appropriate place. 
+  - This script also uses umask to atomically set permissions of those
+    directories
+- ./own-tree.sh <NAME> will set owners of the various mailboxes
 
-1. ./create-tree.sh <name>
-2. make install DEST=<name/bin>
-3. Go into <name> directory
-4. Run ./tester.sh
+1. sudo ./create-tree.sh <name>
+2. sudo make install DEST=<name/bin>
+3. sudo ./own-tree.sh <name>
+4. Go into <name> directory
+5. Run ./tester.sh
 
 - Running tests individually messes up the relative paths so it must be run
   from <name> directory

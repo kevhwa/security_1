@@ -45,6 +45,7 @@ chown urushinic urushinic
 chown vegetocarbonaceous vegetocarbonaceous
 chown wamara wamara
 chown whaledom whaledom
+chown mushu mushu
 
 cd ../bin
 

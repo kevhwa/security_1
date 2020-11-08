@@ -15,40 +15,41 @@ mkdir lib
 cd mail 
 
 (umask 077; mkdir addleness)
- (umask 077; mkdir analects)
- (umask 077; mkdir annalistic)
- (umask 077; mkdir anthropomorphologically)
- (umask 077; mkdir blepharosphincterectomy)
- (umask 077; mkdir corector)
- (umask 077; mkdir durwaun)
- (umask 077; mkdir dysphasia)
- (umask 077; mkdir encampment)
- (umask 077; mkdir endoscopic)
- (umask 077; mkdir exilic)
-mkdir forfend
-mkdir gorbellied
-mkdir gushiness
-mkdir muermo
-mkdir neckar
-mkdir outmate
-mkdir outroll
-mkdir overrich
-mkdir philosophicotheological
-mkdir pockwood
-mkdir polypose
-mkdir refluxed
-mkdir reinsure
-mkdir repine
- (umask 077; mkdir scerne)
-mkdir starshine
-mkdir unauthoritativeness
-mkdir unminced
-mkdir unrosed
-mkdir untranquil
-mkdir urushinic
-mkdir vegetocarbonaceous
-mkdir wamara
-mkdir whaledom
+(umask 077; mkdir analects)
+(umask 077; mkdir annalistic)
+(umask 077; mkdir anthropomorphologically)
+(umask 077; mkdir blepharosphincterectomy)
+(umask 077; mkdir corector)
+(umask 077; mkdir durwaun)
+(umask 077; mkdir dysphasia)
+(umask 077; mkdir encampment)
+(umask 077; mkdir endoscopic)
+(umask 077; mkdir exilic)
+(umask 077; mkdir forfend)
+(umask 077; mkdir gorbellied)
+(umask 077; mkdir gushiness)
+(umask 077; mkdir muermo)
+(umask 077; mkdir neckar)
+(umask 077; mkdir outmate)
+(umask 077; mkdir outroll)
+(umask 077; mkdir overrich)
+(umask 077; mkdir philosophicotheological)
+(umask 077; mkdir pockwood)
+(umask 077; mkdir polypose)
+(umask 077; mkdir refluxed)
+(umask 077; mkdir reinsure)
+(umask 077; mkdir repine)
+(umask 077; mkdir scerne)
+(umask 077; mkdir starshine)
+(umask 077; mkdir unauthoritativeness)
+(umask 077; mkdir unminced)
+(umask 077; mkdir unrosed)
+(umask 077; mkdir untranquil)
+(umask 077; mkdir urushinic)
+(umask 077; mkdir vegetocarbonaceous)
+(umask 077; mkdir wamara)
+(umask 077; mkdir whaledom)
+(umask 077; mkdir mushu);
 
 cd ../../
 
