@@ -1,10 +1,10 @@
 #~/bin/bash
 
-
 rm -rf "$1"
 mkdir "$1"
 
-#make the sub directories
+
+#make sub directories
 cd "$1"
 mkdir bin
 mkdir mail
@@ -49,7 +49,7 @@ cd mail
 (umask 077; mkdir vegetocarbonaceous)
 (umask 077; mkdir wamara)
 (umask 077; mkdir whaledom)
-(umask 077; mkdir mushu);
+(umask 077; mkdir temp);
 
 cd ../../
 
@@ -69,4 +69,3 @@ cp testInvalidFormat5 $1/inputs/
 cp testLongStr $1/inputs/
 cp testMoreRecv $1/inputs/
 cp longfile.txt $1/inputs/
-

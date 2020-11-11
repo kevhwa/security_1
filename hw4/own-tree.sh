@@ -1,12 +1,6 @@
 #~/bin/bash
 
-#make the sub directories
 cd "$1"
-#mkdir bin
-#mkdir mail
-#mkdir inputs
-#mkdir tmp
-#mkdir lib
 
 cd mail 
 
@@ -45,12 +39,17 @@ chown urushinic urushinic
 chown vegetocarbonaceous vegetocarbonaceous
 chown wamara wamara
 chown whaledom whaledom
-chown mushu mushu
+chown mushu temp
 
 cd ../bin
 
-chown root mail-in
-chown root mail-out
-chmod u+s mail-in
-chmod u+s mail-out
 chmod 700 mail-out
+chown root mail-out
+
+chmod u+s mail-in
+#chmod 700 mail-in
+
+cd ../
+
+chmod 700 tmp
+chown root tmp

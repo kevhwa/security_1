@@ -21,8 +21,8 @@ DATA
 aldskjfldsajf;alkfdsaFAEWRWQRQ$#TRE^%&YEF43TQ$T$QT#Q$TWRGAG$%&*&^(*OIL
 EAWFAW#T#WT$WYW#ywy4y45657$%&$*(*(^%$#@$%^&*(8765
 .
-MAIL FROM:<mushu>
-RCPT TO:<mushu>
+MAIL FROM:<temp>
+RCPT TO:<temp>
 DATA
 .sending to myself
 ..
@@ -33,9 +33,9 @@ aldskjfldsajf;alkfdsaFAEWRWQRQ$#TRE^%&YEF43TQ$T$QT#Q$TWRGAG$%&*&^(*OIL
 EAWFAW#T#WT$WYW#ywy4y45657$%&$*(*(^%$#@$%^&*(8765
 .
 MAIL FROM:<scerne>
-RCPT TO:<mushu>
+RCPT TO:<temp>
 DATA
-.i
+.iasdfad
 ..
 ....
 .....
