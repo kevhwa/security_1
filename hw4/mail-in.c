@@ -93,7 +93,6 @@ int main(int argc, char **argv) {
 		}
 		
 		//write from and to to temp file
-
 		FILE *temp_fp = getTempFile(&list);
 		writeTempFile(temp_fp, &list);
 		if (eof) {
@@ -101,12 +100,7 @@ int main(int argc, char **argv) {
 			fclose(temp_fp);
 			break;
 		}
-/*		if (res < 0) {
-			free_list(&list);
-			fclose(temp_fp);
-			break;
-		}
-*/	
+	
 		char requestLine[BUFF_SIZE];
 		for(int i = 1; i < list.count; i++) { //ignoring sender
 			fseek(temp_fp, 0, SEEK_SET);
@@ -117,7 +111,6 @@ int main(int argc, char **argv) {
 				die("pipe error");
 
 			pid_t pid = fork();
-			//char mailout[] = "mail-out";
 
 			if(pid < 0) {
 				die("Fork failed\n");
@@ -131,7 +124,6 @@ int main(int argc, char **argv) {
 					die("execl failed\n");
 
 			} else{
-				//sleep(1);
 				close(fd[0]);
 
 				while (1) {
@@ -151,14 +143,7 @@ int main(int argc, char **argv) {
 						break;	
 					} else {
 						write(fd[1], requestLine, strlen(requestLine));
-						//the buffer was full and last char is null terminated
-						//buffer is not full and there is a /n somewhere
-						//if (requestLine[strlen(requestLine) - 1] == '\n') {
-							//write(fd[1], "\n", 1);
-				
-						//}
 					}
-
 				}
 			}
 			close(fd[1]);
@@ -174,14 +159,12 @@ int main(int argc, char **argv) {
 				if (es == 128) {
 					fprintf(stderr, "Error from child: Invalid recipient\n");
 				}
-
 				//printf("Exit status was %d\n", es);
 			}
 		}
 		fclose(temp_fp);
 		removeTempFile(&list);
 		free_list(&list);
-
 	}
 }
 
@@ -380,7 +363,6 @@ int getSender(struct headers *list) {
 
 	sender[strlen(sender) - 1] = '\0'; // get rid of ending >
 	sender++;
-
 	//printf("sender: %s\n", sender);
 
 	if (checkValidUser(sender) != 1) {
@@ -638,10 +620,6 @@ char *getToString(struct headers *list) {
 	char next[] = ", ";
 	int size = 0;
 
-	//char **index = list->rec_list;
-	//char *temp;
-
-	//size += strlen(to);
 	size += strlen(list->rec_list[1]);
 	//printf("%s\n", list->rec_list[0]);
 

@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
 
 	FILE *fp1 = getRecvFile(reciever);
 	char requestLine[BUFF_SIZE];
+	char oldLine[BUFF_SIZE];
 	
 	while (1) {
 
@@ -43,29 +44,23 @@ int main(int argc, char **argv) {
 			die("fgets failed\n");	
 		}
 		//printf("debug: %s", requestLine);
-
 		
-		//open file using rec_list[i < rec_count]
-
-		if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
+		if ((strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n")) == 0 && strlen(oldLine) != BUFF_SIZE - 1) {
 			//printf("reached end of data\n");
 			break;	
 		} else {
-			if (strncmp(requestLine, ".", 1) == 0) {
+			if (strncmp(requestLine, ".", 1 && strlen(oldLine) != BUFF_SIZE - 1) == 0) {
 				char *ptr = requestLine;
 				ptr++;
-				fputs(ptr, fp1);
+				if (fputs(ptr, fp1) < 0) {
+					die("fputs failed\n");
+				}
 			} else {
 				fputs(requestLine, fp1);	
 			}
-			//the buffer was full and last char is null terminated
-			//buffer is not full and there is a /n somewhere
-			//if (requestLine[strlen(requestLine) - 1] == '\n') {
-			//	fputc('\n', fp1);
-				
-			//}
 		}
 
+		strcpy(oldLine, requestLine);
 	}
 
 }
@@ -90,7 +85,6 @@ int checkValidUser(char *user) {
 	struct dirent *dp;
 	DIR *dfd;
 
-	//*********** need to change when you move exec to bin******
 	if ((dfd = opendir("mail")) == NULL) {
 		die("Can't open mail dir\n");
 	}
@@ -126,7 +120,6 @@ int checkMailCount(char *user) {
 	strcat(dir_name, user);
 	//printf("path name %s\n", dir_name);
 
-	//*********** need to change when you move exec to bin******
 	if ((dfd = opendir(dir_name)) == NULL) {
 		die("Can't open mail dir in checkMailCount\n");
 	}
