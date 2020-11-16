@@ -58,7 +58,5 @@ else
    (umask 077; mkdir vegetocarbonaceous)
    (umask 077; mkdir wamara)
    (umask 077; mkdir whaledom)
-   (umask 077; mkdir temp)
-
 
 fi

@@ -26,11 +26,8 @@ FILE *getRecvFile(char *);
 
 int main(int argc, char **argv) {
 
-	//printf("\n*****IM STARTING**********\n");
-
 	char *reciever = argv[1];
 	if (checkValidUser(reciever) != 1) {
-		//printf("invalid user\n");
 		exit(128);
 	}
 
@@ -41,19 +38,17 @@ int main(int argc, char **argv) {
 	while (1) {
 
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {
-			die("fgets failed\n");	
+			die("Fgets failed, quitting\n");	
 		}
-		//printf("debug: %s", requestLine);
 		
 		if ((strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0) && strlen(oldLine) != BUFF_SIZE - 1) {
-			//printf("reached end of data\n");
 			break;	
 		} else {
 			if (strncmp(requestLine, ".", 1) == 0 && strlen(oldLine) != BUFF_SIZE - 1) {
 				char *ptr = requestLine;
 				ptr++;
 				if (fputs(ptr, fp1) < 0) {
-					die("fputs failed\n");
+					die("Fputs failed, quitting\n");
 				}
 			} else {
 				fputs(requestLine, fp1);	
@@ -72,7 +67,7 @@ int checkEOF(void) {
 		ungetc(temp, stdin);
 	} else {
 		if(ferror(stdin) != 0) {
-			die("error in fgetc\n");
+			die("Fgetc failed, quitting\n");
 		}
 		return 1;
 	}
@@ -86,14 +81,13 @@ int checkValidUser(char *user) {
 	DIR *dfd;
 
 	if ((dfd = opendir("mail")) == NULL) {
-		die("Can't open mail dir\n");
+		die("Open dir failed, quitting\n");
 	}
 
 	while ((dp = readdir(dfd)) != NULL)
 	{
 		
 		if (strcmp(user, dp->d_name) == 0) {
-			//printf("user found\n");
 			return 1;
 		} else {
 			continue;
@@ -105,8 +99,6 @@ int checkValidUser(char *user) {
 }
 
 int checkMailCount(char *user) {
-	
-	//printf("\nInside checkMailCount function\n");
 
 	struct dirent *dp;
 	DIR *dfd;
@@ -115,13 +107,11 @@ int checkMailCount(char *user) {
 	char dir_name[strlen(path) + strlen(user) + 1];
 	struct stat st;
 
-	//create "test/mail/username"
 	strcpy(dir_name, path);
 	strcat(dir_name, user);
-	//printf("path name %s\n", dir_name);
 
 	if ((dfd = opendir(dir_name)) == NULL) {
-		die("Can't open mail dir in checkMailCount\n");
+		die("Open dir failed, quitting\n");
 	}
 
 	while ((dp = readdir(dfd)) != NULL) {
@@ -133,7 +123,6 @@ int checkMailCount(char *user) {
 		strcat(filePath, dp->d_name);
 		
 		if(stat(filePath, &st) == -1 ) {
-			//printf("Unable to stat file: %s\n",filePath) ;
 			continue ;
 		}
 		if (S_ISDIR(st.st_mode)) {
@@ -144,15 +133,13 @@ int checkMailCount(char *user) {
 	}
 
 	if (count >= 99999) {
-		die("too much mail\n");
+		die("Mail overload, quitting\n");
 	}
-	//printf("mail count: %d\n", count);
 	return count;
 }
 
 char *getMailCountString(char *user) {
 	int mailCount = checkMailCount(user) + 1;
-	//printf("written mail count %d\n", mailCount);
 
 	int dig = 1;
 	for (int i = 0; i < 5; i++) {
@@ -161,55 +148,44 @@ char *getMailCountString(char *user) {
 		}
 		break;
 	}
-	//printf("digits: %d\n", dig);
 
 	char *num = malloc(sizeof(char) * 5 + 1);
 	int zero = 5 - dig;
 	char temp[5];
 	int k = 0;
 	sprintf(temp, "%d", mailCount);
-	//printf("curr num: %s\n", temp);
 
 	for (int i = 0; i < 5; i++) {
 		if (zero > 0) {
 			num[i] = '0';
 			zero--;
 		} else {
-			//printf("here\n");
 			num[i] = temp[k];
 			k++;
 		}
 	}
 	num[5] = '\0';
 
-	//printf("written mail count string %s\n", num);
 	return num;
 }
 
 FILE *getRecvFile(char *recver) {
-	//printf("\nInside recv file function\n");
 	
-	//open a tmp file
 	char *num = getMailCountString(recver);
 
 	char path[] = "mail/";
 	char filePath[strlen(path) + strlen(recver) + 1 + strlen(num) + 1];
-	//sprintf(filePath, "%s%s%s", path, rec_one, num);
 	strcpy(filePath, path);
 	strcat(filePath, recver);
 	strcat(filePath, "/");
 	strcat(filePath, num);
 
-	//printf("file path: %s\n", filePath);
 	FILE *fp = fopen(filePath, "w+");
 	
 	if (fp == NULL) {
-		die("fopen failed");
+		die("Fopen failed, quitting");
 	}
 
 	free(num);
 	return fp;
-
 }
-
-
