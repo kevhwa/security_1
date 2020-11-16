@@ -1,11 +1,10 @@
 Directions: 
+
+1. make install DEST=<dir-name>
+
+- make install DEST=($DEST) will copy the executables into the provided path
 - make will create the executables in current directory
 - make clean will delete by products of make in current directory
-- make install DEST=($DEST) will copy the executables into the provided path
-
-1. make install DEST=<name>
-3. Go into <name> directory
-4. Run ./tester.sh
 
 Security architecture
 a. Each mailbox is owned by each user and only that specific user has full access. No group or others have permissions.
