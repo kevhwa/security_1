@@ -45,11 +45,11 @@ int main(int argc, char **argv) {
 		}
 		//printf("debug: %s", requestLine);
 		
-		if ((strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n")) == 0 && strlen(oldLine) != BUFF_SIZE - 1) {
+		if ((strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0) && strlen(oldLine) != BUFF_SIZE - 1) {
 			//printf("reached end of data\n");
 			break;	
 		} else {
-			if (strncmp(requestLine, ".", 1 && strlen(oldLine) != BUFF_SIZE - 1) == 0) {
+			if (strncmp(requestLine, ".", 1) == 0 && strlen(oldLine) != BUFF_SIZE - 1) {
 				char *ptr = requestLine;
 				ptr++;
 				if (fputs(ptr, fp1) < 0) {
