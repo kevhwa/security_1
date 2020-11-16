@@ -13,6 +13,8 @@ clean:
 	rm -rf $(objects) a.out *.o
 
 install: mail-in mail-out
-	cp mail-in mail-out $(DEST)
+		./install-unpriv.sh $(DEST)
+		cp mail-in mail-out $(DEST)/bin
+		sudo ./install-priv.sh $(DEST)
 
 .PHONY: $(PHONY)

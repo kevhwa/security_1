@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 	FILE *fp1 = getRecvFile(reciever);
 	char requestLine[BUFF_SIZE];
 	char oldLine[BUFF_SIZE];
-	
+
 	while (1) {
 
 		if (fgets(requestLine, sizeof(requestLine), stdin) == NULL) {

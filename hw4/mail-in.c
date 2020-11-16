@@ -578,7 +578,7 @@ FILE *getTempFile(struct headers *list) {
 	FILE *fp = fopen(filePath, "w+");
 
 	if (fp == NULL) {
-		die("fopen failed");
+		die("fopen failed in mail-in");
 	}
 
 	//free(num);
