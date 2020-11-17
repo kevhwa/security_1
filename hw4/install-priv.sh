@@ -57,6 +57,9 @@ then
 
     chmod 700 tmp
     chown root tmp
+    
+    chown root bin
+    chown root mail
 
 else
 

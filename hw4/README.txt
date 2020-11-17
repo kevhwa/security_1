@@ -6,6 +6,9 @@ Directions:
 - make will create the executables in current directory
 - make clean will delete by products of make in current directory
 
+
+
+
 Security architecture
 a. Each mailbox is owned by each user and only that specific user has full access. No group or others have permissions.
 b. Mail-in is executable by anyone and is a privileged program. 

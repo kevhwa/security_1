@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #define BUFF_SIZE 500
 #define PTR_SIZE 8
@@ -23,6 +24,7 @@ struct headers {
 };
 
 int eof = 0;
+int sigpipe = 0;
 
 int checkEOF(void); 
 int checkValidUser(char *); 
@@ -44,10 +46,22 @@ char *getMailCountString(char *);
 char *getFromString(struct headers *);
 char *getToString(struct headers *);
 
+static void sigpipeHandler(int sig){
+	sigpipe = 1;
+}
+
 int main(int argc, char **argv) {
 
+	struct sigaction action;
 	struct headers list;
 
+	action.sa_handler = sigpipeHandler;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+
+	if (sigaction(SIGPIPE, &action, NULL) != 0)
+		die("Cannot install sigaction handler, quitting\n");
+		
 	while(1) {
 		
 		list.rec_list = malloc (5 * sizeof(list.rec_list));
@@ -115,8 +129,9 @@ int main(int argc, char **argv) {
 			} else if (pid == 0) {
 				if (dup2(fd[0], STDIN_FILENO) != STDIN_FILENO)
 					die("Dup2 failed, quitting\n");
+				
 				close(fd[0]);
-				close(fd[1]);
+			close(fd[1]);
 			
 				if (execlp("./bin/mail-out", "mail-out", temp, NULL) < 0)
 					die("Execl failed, quitting\n");
@@ -134,10 +149,36 @@ int main(int argc, char **argv) {
 						break;
 
 					if (strcmp(requestLine, ".\n" ) == 0 || strcasecmp(requestLine, "data\r\n") == 0 ) {
-						write(fd[1], requestLine, strlen(requestLine));
+						if(write(fd[1], requestLine, strlen(requestLine)) < 0){
+							if (errno == SIGPIPE) {
+								if (sigpipe == 1) {
+									fclose(temp_fp);
+									removeTempFile(&list);
+									free_list(&list);
+									die("SIGPIPE issue, quitting\n");
+								}
+							}
+							fclose(temp_fp);
+							removeTempFile(&list);
+							free_list(&list);
+							die("Write failed, quitting\n");
+						}
 						break;	
 					} else {
-						write(fd[1], requestLine, strlen(requestLine));
+						if(write(fd[1], requestLine, strlen(requestLine)) < 0) {
+							if (errno == SIGPIPE) {
+								if (sigpipe == 1) {
+									fclose(temp_fp);
+									removeTempFile(&list);
+									free_list(&list);
+									die("SIGPIPE issue, quitting\n");
+								}
+							}
+							fclose(temp_fp);
+							removeTempFile(&list);
+							free_list(&list);
+							die("Write failed, quitting\n");
+						}
 					}
 				}
 			}
